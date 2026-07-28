@@ -66,7 +66,8 @@ service cloud.firestore {
                     && request.resource.data.title.size() <= 200
                     && request.resource.data.note is string
                     && request.resource.data.note.size() <= 2000
-                    && request.resource.data.deleted is bool;
+                    && request.resource.data.deleted is bool
+                    && (!('attachments' in request.resource.data) || request.resource.data.attachments.size() <= 10);
       allow delete: if true;
     }
     match /trips/europe-plan-2026/scheduleCustomBlocks/{blockId} {
@@ -77,7 +78,8 @@ service cloud.firestore {
                     && request.resource.data.title is string
                     && request.resource.data.title.size() <= 200
                     && request.resource.data.note is string
-                    && request.resource.data.note.size() <= 2000;
+                    && request.resource.data.note.size() <= 2000
+                    && (!('attachments' in request.resource.data) || request.resource.data.attachments.size() <= 10);
       allow delete: if true;
     }
     match /{document=**} {

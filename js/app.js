@@ -29,6 +29,7 @@ import {
   subscribeToScheduleCustomBlocks,
   addScheduleCustomBlock,
   deleteScheduleCustomBlock,
+  updateScheduleCustomBlockAttachments,
 } from './schedule.js';
 import { isFirebaseConfigured } from './firebaseConfig.js';
 
@@ -232,6 +233,42 @@ async function main() {
         await deleteScheduleCustomBlock(customId);
       } catch (error) {
         console.error('추가한 일정 삭제 실패', error);
+        showFirebaseNotice();
+      }
+    },
+    onAddAttachment: async (block, attachment) => {
+      const attachments = [...(block.attachments || []), attachment];
+      try {
+        if (block.isCustom) {
+          await updateScheduleCustomBlockAttachments(block.customId, attachments);
+        } else {
+          await setScheduleOverride(block.blockKey, {
+            time: block.time,
+            title: block.title,
+            note: block.note || '',
+            attachments,
+          });
+        }
+      } catch (error) {
+        console.error('첨부 추가 실패', error);
+        showFirebaseNotice();
+      }
+    },
+    onRemoveAttachment: async (block, index) => {
+      const attachments = (block.attachments || []).filter((_, i) => i !== index);
+      try {
+        if (block.isCustom) {
+          await updateScheduleCustomBlockAttachments(block.customId, attachments);
+        } else {
+          await setScheduleOverride(block.blockKey, {
+            time: block.time,
+            title: block.title,
+            note: block.note || '',
+            attachments,
+          });
+        }
+      } catch (error) {
+        console.error('첨부 삭제 실패', error);
         showFirebaseNotice();
       }
     },

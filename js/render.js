@@ -170,7 +170,7 @@ function renderTimeBlockEditControls(block, handlers) {
     editButton.setAttribute('aria-label', '일정 수정');
 
     form = renderTimeBlockEditForm(block, (values) => {
-      handlers.onEditBlock(block.blockKey, values);
+      handlers.onEditBlock(block.blockKey, { ...values, attachments: block.attachments || [] });
       form.hidden = true;
     });
     form.hidden = true;
@@ -200,12 +200,111 @@ function renderTimeBlockEditControls(block, handlers) {
     if (block.isCustom) {
       handlers.onDeleteCustomBlock(block.customId);
     } else {
-      handlers.onDeleteBlock(block.blockKey, { time: block.time, title: block.title, note: block.note || '' });
+      handlers.onDeleteBlock(block.blockKey, {
+        time: block.time,
+        title: block.title,
+        note: block.note || '',
+        attachments: block.attachments || [],
+      });
     }
   });
   controls.appendChild(deleteButton);
 
   return { controls, form };
+}
+
+/**
+ * URL에서 표시용 호스트명을 뽑는다. 잘못된 URL이면 원본 문자열을 그대로 쓴다.
+ * @param {string} url
+ * @returns {string}
+ */
+function safeHostname(url) {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return url;
+  }
+}
+
+/**
+ * 일정 블록의 이미지/링크 첨부 목록과, 편집모드일 때의 첨부 추가 폼을 만든다.
+ * @param {{ attachments?: Array<{ type: string, url: string, label?: string }> }} block
+ * @param {object} handlers
+ * @param {boolean} editMode
+ * @returns {HTMLElement}
+ */
+function renderAttachmentsSection(block, handlers, editMode) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'attachment-section';
+
+  const attachments = block.attachments || [];
+  if (attachments.length > 0) {
+    const list = document.createElement('ul');
+    list.className = 'attachment-list';
+    attachments.forEach((attachment, index) => {
+      const li = document.createElement('li');
+      li.className = 'attachment-item';
+
+      if (attachment.type === 'image') {
+        const img = document.createElement('img');
+        img.className = 'attachment-image';
+        img.src = attachment.url;
+        img.alt = attachment.label || '첨부 이미지';
+        img.loading = 'lazy';
+        li.appendChild(img);
+      } else {
+        const link = document.createElement('a');
+        link.className = 'attachment-link-chip';
+        link.href = attachment.url;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.textContent = attachment.label || safeHostname(attachment.url);
+        li.appendChild(link);
+      }
+
+      if (editMode) {
+        const removeButton = document.createElement('button');
+        removeButton.type = 'button';
+        removeButton.className = 'attachment-remove-button';
+        removeButton.textContent = '✕';
+        removeButton.setAttribute('aria-label', '첨부 삭제');
+        removeButton.addEventListener('click', () => handlers.onRemoveAttachment(block, index));
+        li.appendChild(removeButton);
+      }
+
+      list.appendChild(li);
+    });
+    wrapper.appendChild(list);
+  }
+
+  if (editMode) {
+    const form = document.createElement('form');
+    form.className = 'attachment-add-form';
+    form.innerHTML = `
+      <select name="type" aria-label="첨부 종류">
+        <option value="image">이미지</option>
+        <option value="link">링크</option>
+      </select>
+      <input type="url" name="url" placeholder="https://..." aria-label="URL" required />
+      <input type="text" name="label" placeholder="이름 (선택)" aria-label="이름" />
+      <button type="submit">첨부 추가</button>
+    `;
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const data = new FormData(form);
+      const url = data.get('url').trim();
+      if (!url) return;
+      handlers.onAddAttachment(block, {
+        type: data.get('type'),
+        url,
+        label: data.get('label').trim(),
+      });
+      form.reset();
+    });
+    wrapper.appendChild(form);
+  }
+
+  return wrapper;
 }
 
 /**
@@ -246,7 +345,8 @@ function renderTimeBlock(block, rates, handlers, editMode) {
     main.appendChild(controls);
   }
 
-  const hasMore = Boolean(block.note) || (block.costItems && block.costItems.length > 0);
+  const hasAttachments = Boolean(block.attachments && block.attachments.length > 0);
+  const hasMore = Boolean(block.note) || (block.costItems && block.costItems.length > 0) || hasAttachments || editMode;
   if (hasMore) {
     const more = document.createElement('details');
     more.className = 'time-block-more';
@@ -259,6 +359,10 @@ function renderTimeBlock(block, rates, handlers, editMode) {
       note.className = 'time-block-note';
       note.textContent = block.note;
       more.appendChild(note);
+    }
+
+    if (hasAttachments || editMode) {
+      more.appendChild(renderAttachmentsSection(block, handlers, editMode));
     }
 
     if (block.costItems && block.costItems.length > 0) {

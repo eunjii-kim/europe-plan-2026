@@ -32,9 +32,9 @@ export function subscribeToScheduleOverrides(onChange, onError) {
 }
 
 /**
- * 기존 일정 블록을 사용자가 지정한 값으로 덮어쓴다.
+ * 기존 일정 블록을 사용자가 지정한 값으로 덮어쓴다. attachments를 포함해 항상 전체 스냅샷을 쓴다.
  * @param {string} blockKey - buildScheduleBlockKey로 만든 키
- * @param {{ time: string, title: string, note: string, deleted?: boolean }} values
+ * @param {{ time: string, title: string, note: string, attachments?: Array, deleted?: boolean }} values
  * @returns {Promise<void>}
  */
 export async function setScheduleOverride(blockKey, values) {
@@ -42,6 +42,7 @@ export async function setScheduleOverride(blockKey, values) {
     time: values.time,
     title: values.title,
     note: values.note,
+    attachments: values.attachments || [],
     deleted: Boolean(values.deleted),
     updatedAt: serverTimestamp(),
   });
@@ -105,4 +106,14 @@ export async function addScheduleCustomBlock(dayId, values) {
  */
 export async function deleteScheduleCustomBlock(customId) {
   await deleteDoc(doc(scheduleCustomBlocksCollection, customId));
+}
+
+/**
+ * 사용자가 추가한 일정 블록의 첨부 목록만 갱신한다.
+ * @param {string} customId
+ * @param {Array<{ type: string, url: string, label?: string }>} attachments
+ * @returns {Promise<void>}
+ */
+export async function updateScheduleCustomBlockAttachments(customId, attachments) {
+  await setDoc(doc(scheduleCustomBlocksCollection, customId), { attachments }, { merge: true });
 }
