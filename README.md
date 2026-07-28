@@ -9,6 +9,7 @@
 - CHF/EUR 환율을 D-day 옆에 작게 표시, 1시간마다 자동 갱신 (예산 탭에는 출처/조회 시각까지 상세 표시)
 - 원래 일정표 비용 항목을 직접 수정/원상복구 가능 (기기 간 실시간 공유)
 - 편집모드(🔧)에서 일정 시간/제목/메모를 직접 수정하거나 새 일정을 추가/삭제 가능 (기기 간 실시간 공유)
+- 편집모드에서 일정 더보기에 이미지/링크 첨부 가능 (URL 붙여넣기 또는 파일 업로드)
 - 추가 필요 예산 입력 (기기 간 실시간 공유)
 - 라이트/다크 모드 토글
 
@@ -101,7 +102,35 @@ service cloud.firestore {
 
 설정 전(또는 연결 실패 시)에도 사이트 자체(일정 보기)는 정상 동작하며, 예산 탭에는 안내 배너가 표시됩니다.
 
-## 2. GitHub Pages로 배포하기
+## 2. Firebase Storage 설정 (파일 업로드용 — 수동 필요)
+
+편집모드의 더보기 첨부에서 "📁 사진 파일 업로드"로 기기의 사진을 직접 올리려면 Firebase Storage가 필요합니다. **URL로 이미지/링크를 붙여넣는 방식은 이 설정 없이도 바로 동작하며, 파일 업로드만 이 설정이 필요합니다.**
+
+이 단계는 Firebase 콘솔에서 사용자가 직접 진행해야 하며 코드로 자동화할 수 없습니다.
+
+1. [Firebase 콘솔](https://console.firebase.google.com)의 `europe-plan-2026` 프로젝트 → 왼쪽 메뉴 **Storage** → "시작하기".
+2. 보안 규칙은 일단 기본값(프로덕션 모드)으로 시작하고, 리전은 Firestore와 동일한 `asia-northeast3`을 선택합니다(선택 가능한 경우).
+3. 활성화 후 **Storage → 규칙** 탭에서 아래 내용을 붙여넣고 게시합니다.
+
+```
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /schedule-attachments/europe-plan-2026/{allPaths=**} {
+      allow read: if true;
+      allow write: if request.resource.size < 10 * 1024 * 1024
+                    && request.resource.contentType.matches('image/.*');
+    }
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
+```
+
+게시 전까지는 "📁 사진 파일 업로드"를 시도하면 실패 안내 배너가 표시됩니다(URL 첨부는 영향받지 않습니다).
+
+## 3. GitHub Pages로 배포하기
 
 1. GitHub에 새 저장소를 만듭니다 (저장소 이름은 폴더명과 동일하게 `europe-plan-2026` 권장).
 2. 이 폴더에서 git 초기화 후 커밋, 원격 저장소에 push.

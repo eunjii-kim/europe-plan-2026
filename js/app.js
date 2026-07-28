@@ -31,6 +31,7 @@ import {
   deleteScheduleCustomBlock,
   updateScheduleCustomBlockAttachments,
 } from './schedule.js';
+import { uploadScheduleAttachment } from './storage.js';
 import { isFirebaseConfigured } from './firebaseConfig.js';
 
 const EDIT_MODE_ICONS = { off: '✏️', on: '🔧' };
@@ -140,13 +141,39 @@ function setupBudgetForm() {
   });
 }
 
-/** Firebase 미설정/연결 실패 안내 배너를 표시한다. */
-function showFirebaseNotice() {
+/**
+ * Firebase 미설정/연결 실패 안내 배너를 표시한다.
+ * @param {string} [customMessage] - 지정하면 기본 안내 문구 대신 이 메시지를 보여준다.
+ */
+function showFirebaseNotice(customMessage) {
   const notice = document.getElementById('firebaseNotice');
   notice.hidden = false;
+  if (customMessage) {
+    notice.textContent = customMessage;
+    return;
+  }
   notice.textContent = isFirebaseConfigured
     ? '예산 서버 연결에 실패했습니다. 네트워크 상태를 확인해주세요.'
     : 'Firebase가 아직 설정되지 않았습니다. README.md의 안내에 따라 firebaseConfig.js를 설정하면 여러 기기 간 예산 공유가 활성화됩니다.';
+}
+
+/**
+ * 일정 블록(기존 블록 또는 사용자가 추가한 블록)의 첨부 목록을 저장한다.
+ * @param {object} block
+ * @param {Array<{ type: string, url: string, label?: string }>} attachments
+ * @returns {Promise<void>}
+ */
+async function saveBlockAttachments(block, attachments) {
+  if (block.isCustom) {
+    await updateScheduleCustomBlockAttachments(block.customId, attachments);
+  } else {
+    await setScheduleOverride(block.blockKey, {
+      time: block.time,
+      title: block.title,
+      note: block.note || '',
+      attachments,
+    });
+  }
 }
 
 async function main() {
@@ -237,39 +264,30 @@ async function main() {
       }
     },
     onAddAttachment: async (block, attachment) => {
-      const attachments = [...(block.attachments || []), attachment];
       try {
-        if (block.isCustom) {
-          await updateScheduleCustomBlockAttachments(block.customId, attachments);
-        } else {
-          await setScheduleOverride(block.blockKey, {
-            time: block.time,
-            title: block.title,
-            note: block.note || '',
-            attachments,
-          });
-        }
+        await saveBlockAttachments(block, [...(block.attachments || []), attachment]);
       } catch (error) {
         console.error('첨부 추가 실패', error);
         showFirebaseNotice();
       }
     },
     onRemoveAttachment: async (block, index) => {
-      const attachments = (block.attachments || []).filter((_, i) => i !== index);
       try {
-        if (block.isCustom) {
-          await updateScheduleCustomBlockAttachments(block.customId, attachments);
-        } else {
-          await setScheduleOverride(block.blockKey, {
-            time: block.time,
-            title: block.title,
-            note: block.note || '',
-            attachments,
-          });
-        }
+        await saveBlockAttachments(block, (block.attachments || []).filter((_, i) => i !== index));
       } catch (error) {
         console.error('첨부 삭제 실패', error);
         showFirebaseNotice();
+      }
+    },
+    onUploadAttachment: async (block, file) => {
+      try {
+        const url = await uploadScheduleAttachment(file, block.blockKey || block.customId);
+        await saveBlockAttachments(block, [...(block.attachments || []), { type: 'image', url, label: '' }]);
+      } catch (error) {
+        console.error('첨부 파일 업로드 실패', error);
+        showFirebaseNotice(
+          'Storage가 활성화되어 있는지 확인해주세요. 자세한 내용은 README.md를 참고하세요.',
+        );
       }
     },
   };

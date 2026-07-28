@@ -1,5 +1,6 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js';
 import { getFirestore, collection } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js';
+import { getStorage } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-storage.js';
 import { TRIP_ID } from './constants.js';
 
 /**
@@ -21,6 +22,9 @@ export const isFirebaseConfigured = firebaseConfig.apiKey !== 'YOUR_API_KEY';
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+
+/** 일정 첨부 이미지 업로드용 Firebase Storage 인스턴스. Storage는 콘솔에서 별도로 활성화해야 한다(README.md 참고). */
+export const storage = getStorage(app);
 
 /** trips/{TRIP_ID}/budgetItems 서브컬렉션 참조 (사용자가 추가한 예산) */
 export const budgetItemsCollection = collection(db, 'trips', TRIP_ID, 'budgetItems');
