@@ -56,6 +56,7 @@ export function renderDayNav(navEl, itineraryData) {
     const pill = document.createElement('button');
     pill.type = 'button';
     pill.className = 'day-pill';
+    pill.dataset.dayId = day.id;
     pill.style.setProperty('--pill-accent', `var(${accentVar})`);
     pill.innerHTML = `<span>${day.dateLabel}</span><small>${flag} ${day.region}</small>`;
     pill.addEventListener('click', () => {
@@ -63,6 +64,21 @@ export function renderDayNav(navEl, itineraryData) {
     });
     navEl.appendChild(pill);
   }
+}
+
+/**
+ * 날짜 네비게이션에서 현재 스크롤 위치에 해당하는 날짜 pill을 활성 표시한다.
+ * @param {HTMLElement} navEl
+ * @param {string} dayId
+ */
+export function setActiveDayPill(navEl, dayId) {
+  navEl.querySelectorAll('.day-pill').forEach((pill) => {
+    const isActive = pill.dataset.dayId === dayId;
+    pill.classList.toggle('is-active', isActive);
+    if (isActive) {
+      pill.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    }
+  });
 }
 
 /**

@@ -233,6 +233,20 @@ main {
   font-size: 0.7rem;
 }
 
+.day-pill.is-active {
+  background: var(--primary-muted);
+  border-color: var(--primary);
+}
+
+.day-pill.is-active span {
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.day-pill.is-active small {
+  color: var(--primary);
+}
+
 .day-list {
   display: flex;
   flex-direction: column;

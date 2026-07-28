@@ -12,6 +12,7 @@ import {
   renderBudgetList,
 } from './render.js';
 import { formatKrw, applyBudgetOverrides } from './budgetCalc.js';
+import { setupScrollSpy } from './scrollSpy.js';
 import {
   subscribeToBudgetItems,
   addBudgetItem,
@@ -159,11 +160,14 @@ async function main() {
     },
   };
 
+  const dayNavEl = document.getElementById('dayNav');
+  const tabBarEl = document.querySelector('.tab-bar');
+
   let latestOverridesMap = new Map();
   const renderScheduleAndSummary = (overridesMap) => {
     latestOverridesMap = overridesMap;
     const effectiveData = applyBudgetOverrides(itineraryData, overridesMap);
-    renderDayNav(document.getElementById('dayNav'), effectiveData);
+    renderDayNav(dayNavEl, effectiveData);
     renderDayList(dayListEl, effectiveData, rates, todayDayId, costItemHandlers);
     plannedTotal = renderBudgetSummary(
       document.getElementById('categoryBreakdown'),
@@ -172,6 +176,7 @@ async function main() {
       rates,
     );
     updateGrandTotal();
+    setupScrollSpy(dayListEl, dayNavEl, tabBarEl);
   };
 
   let latestBudgetItems = [];
