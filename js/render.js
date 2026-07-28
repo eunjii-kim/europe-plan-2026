@@ -34,14 +34,14 @@ export function computeDdayLabel(tripInfo, today = new Date()) {
 }
 
 /**
- * 지역명으로 스위스/이탈리아 구간을 판별해 accent 색상 CSS 변수 이름을 반환한다.
+ * 지역명으로 스위스/이탈리아 구간을 판별해 accent 색상 CSS 변수 이름과 국기 이모지를 반환한다.
  * @param {string} region
- * @returns {{ accentVar: string, bgVar: string, label: string }}
+ * @returns {{ accentVar: string, bgVar: string, label: string, flag: string }}
  */
 function getCountryAccent(region) {
   return SWISS_REGIONS.has(region)
-    ? { accentVar: '--swiss-accent', bgVar: '--swiss-accent-bg', label: '스위스' }
-    : { accentVar: '--italy-accent', bgVar: '--italy-accent-bg', label: '이탈리아' };
+    ? { accentVar: '--swiss-accent', bgVar: '--swiss-accent-bg', label: '스위스', flag: '🇨🇭' }
+    : { accentVar: '--italy-accent', bgVar: '--italy-accent-bg', label: '이탈리아', flag: '🇮🇹' };
 }
 
 /**
@@ -52,12 +52,12 @@ function getCountryAccent(region) {
 export function renderDayNav(navEl, itineraryData) {
   navEl.innerHTML = '';
   for (const day of itineraryData) {
-    const { accentVar } = getCountryAccent(day.region);
+    const { accentVar, flag } = getCountryAccent(day.region);
     const pill = document.createElement('button');
     pill.type = 'button';
     pill.className = 'day-pill';
     pill.style.setProperty('--pill-accent', `var(${accentVar})`);
-    pill.innerHTML = `<span>${day.dateLabel}</span><small>${day.region}</small>`;
+    pill.innerHTML = `<span>${day.dateLabel}</span><small>${flag} ${day.region}</small>`;
     pill.addEventListener('click', () => {
       document.getElementById(day.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
@@ -223,7 +223,7 @@ function escapeHtml(text) {
 export function renderDayList(listEl, itineraryData, rates, todayDayId, handlers) {
   listEl.innerHTML = '';
   itineraryData.forEach((day, index) => {
-    const { accentVar, bgVar } = getCountryAccent(day.region);
+    const { accentVar, bgVar, flag } = getCountryAccent(day.region);
     const card = document.createElement('details');
     card.className = 'day-card';
     card.id = day.id;
@@ -234,7 +234,7 @@ export function renderDayList(listEl, itineraryData, rates, todayDayId, handlers
 
     const summary = document.createElement('summary');
     summary.className = 'day-card-summary';
-    summary.innerHTML = `<span class="day-date">${day.dateLabel}</span><span class="day-region" style="--region-bg: var(${bgVar}); --region-fg: var(${accentVar});">${day.region}</span>`;
+    summary.innerHTML = `<span class="day-date">${day.dateLabel}</span><span class="day-region" style="--region-bg: var(${bgVar}); --region-fg: var(${accentVar});">${flag} ${day.region}</span>`;
     card.appendChild(summary);
 
     const blockList = document.createElement('div');
