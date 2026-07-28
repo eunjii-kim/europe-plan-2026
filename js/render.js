@@ -1,4 +1,4 @@
-import { CATEGORY_ICONS, DEFAULT_CATEGORY_ICON, SWISS_REGIONS } from './constants.js';
+import { CATEGORY_ICONS, DEFAULT_CATEGORY_ICON, SWISS_REGIONS, ICONS } from './constants.js';
 import { perPersonKrw, calcPlannedTotalKrw, groupCostByCategory, calcCustomBudgetTotalKrw, formatKrw } from './budgetCalc.js';
 
 /**
@@ -166,7 +166,7 @@ function renderTimeBlockEditControls(block, handlers) {
     const editButton = document.createElement('button');
     editButton.type = 'button';
     editButton.className = 'time-block-icon-button';
-    editButton.textContent = '✏️';
+    editButton.innerHTML = ICONS.pencil;
     editButton.setAttribute('aria-label', '일정 수정');
 
     form = renderTimeBlockEditForm(block, (values) => {
@@ -183,7 +183,7 @@ function renderTimeBlockEditControls(block, handlers) {
       const restoreButton = document.createElement('button');
       restoreButton.type = 'button';
       restoreButton.className = 'time-block-icon-button';
-      restoreButton.textContent = '↺';
+      restoreButton.innerHTML = ICONS.rotateCcw;
       restoreButton.setAttribute('aria-label', '일정 원래대로');
       restoreButton.addEventListener('click', () => handlers.onRestoreBlock(block.blockKey));
       controls.appendChild(restoreButton);
@@ -193,7 +193,7 @@ function renderTimeBlockEditControls(block, handlers) {
   const deleteButton = document.createElement('button');
   deleteButton.type = 'button';
   deleteButton.className = 'time-block-icon-button time-block-delete-button';
-  deleteButton.textContent = '🗑️';
+  deleteButton.innerHTML = ICONS.trash;
   deleteButton.setAttribute('aria-label', '일정 삭제');
   deleteButton.addEventListener('click', () => {
     if (!window.confirm('이 일정을 삭제할까요?')) return;
@@ -266,7 +266,7 @@ function renderAttachmentsSection(block, handlers, editMode) {
         const removeButton = document.createElement('button');
         removeButton.type = 'button';
         removeButton.className = 'attachment-remove-button';
-        removeButton.textContent = '✕';
+        removeButton.innerHTML = ICONS.x;
         removeButton.setAttribute('aria-label', '첨부 삭제');
         removeButton.addEventListener('click', () => handlers.onRemoveAttachment(block, index));
         li.appendChild(removeButton);
@@ -593,7 +593,7 @@ export function renderBudgetList(listEl, items, rates, onDelete) {
     li.innerHTML = `
       <span class="budget-item-title">${escapeHtml(item.title)}</span>
       <span class="budget-item-amount">${item.amount.toLocaleString('ko-KR')} ${item.currency}${krwLabel}</span>
-      <button type="button" class="budget-item-delete" aria-label="삭제">✕</button>
+      <button type="button" class="budget-item-delete" aria-label="삭제">${ICONS.x}</button>
     `;
     li.querySelector('.budget-item-delete').addEventListener('click', () => onDelete(item.id));
     listEl.appendChild(li);

@@ -143,13 +143,15 @@ body {
 }
 
 .icon-toggle-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-width: var(--touch-target);
   min-height: var(--touch-target);
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);
   background: var(--card);
   color: var(--foreground);
-  font-size: 1.1rem;
   cursor: pointer;
 }
 
@@ -371,14 +373,15 @@ main {
 }
 
 .time-block-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-width: 28px;
   min-height: 28px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--card);
   color: var(--foreground);
-  font-size: 0.85rem;
-  line-height: 1;
   cursor: pointer;
 }
 
@@ -478,15 +481,21 @@ main {
   position: absolute;
   top: -6px;
   right: -6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-width: 20px;
   min-height: 20px;
   border-radius: var(--radius-pill);
   border: 1px solid var(--border);
   background: var(--card);
   color: var(--danger);
-  font-size: 0.7rem;
-  line-height: 1;
   cursor: pointer;
+}
+
+.attachment-remove-button svg {
+  width: 12px;
+  height: 12px;
 }
 
 .attachment-add-form {
@@ -793,12 +802,14 @@ main {
 }
 
 .budget-item-delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-width: var(--touch-target);
   min-height: var(--touch-target);
   border: none;
   background: none;
   color: var(--danger);
-  font-size: 1.1rem;
   cursor: pointer;
 }
 

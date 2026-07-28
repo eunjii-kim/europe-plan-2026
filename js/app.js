@@ -1,5 +1,5 @@
 import { itineraryData } from './data.js';
-import { TRIP_INFO, THEME_STORAGE_KEY, EDIT_MODE_STORAGE_KEY, EXCHANGE_RATE_REFRESH_INTERVAL_MS } from './constants.js';
+import { TRIP_INFO, THEME_STORAGE_KEY, EDIT_MODE_STORAGE_KEY, EXCHANGE_RATE_REFRESH_INTERVAL_MS, ICONS } from './constants.js';
 import { getExchangeRates } from './exchangeRate.js';
 import {
   computeDdayLabel,
@@ -33,8 +33,6 @@ import {
 } from './schedule.js';
 import { isFirebaseConfigured } from './firebaseConfig.js';
 
-const EDIT_MODE_ICONS = { off: '✏️', on: '🔧' };
-
 /**
  * 오늘 날짜를 시간대 이슈 없이 'YYYY-MM-DD' 문자열로 변환한다.
  * @param {Date} date
@@ -62,20 +60,33 @@ function setupTabs() {
   });
 }
 
+/**
+ * 현재 라이트/다크 여부에 맞춰 테마 토글 버튼 아이콘을 그린다.
+ * 지금 모드가 아니라 눌렀을 때 바뀔 모드를 아이콘으로 보여준다(라이트면 달, 다크면 해).
+ * @param {HTMLElement} button
+ * @param {'light' | 'dark'} current
+ */
+function renderThemeToggleIcon(button, current) {
+  button.innerHTML = current === 'dark' ? ICONS.sun : ICONS.moon;
+}
+
 /** 라이트/다크 모드 토글 버튼을 연결한다. 선택값은 localStorage에 저장해 다음 방문에도 유지한다. */
 function setupThemeToggle() {
   const root = document.documentElement;
+  const button = document.getElementById('themeToggle');
   const stored = localStorage.getItem(THEME_STORAGE_KEY);
   if (stored === 'light' || stored === 'dark') {
     root.dataset.theme = stored;
   }
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  renderThemeToggleIcon(button, root.dataset.theme || (prefersDark ? 'dark' : 'light'));
 
-  document.getElementById('themeToggle').addEventListener('click', () => {
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  button.addEventListener('click', () => {
     const current = root.dataset.theme || (prefersDark ? 'dark' : 'light');
     const next = current === 'dark' ? 'light' : 'dark';
     root.dataset.theme = next;
     localStorage.setItem(THEME_STORAGE_KEY, next);
+    renderThemeToggleIcon(button, next);
   });
 }
 
@@ -92,14 +103,14 @@ function setupEditModeToggle(onToggle) {
   const button = document.getElementById('editModeToggle');
   const stored = localStorage.getItem(EDIT_MODE_STORAGE_KEY) === 'on';
   document.body.classList.toggle('edit-mode', stored);
-  button.textContent = stored ? EDIT_MODE_ICONS.on : EDIT_MODE_ICONS.off;
+  button.innerHTML = stored ? ICONS.wrench : ICONS.pencil;
   button.setAttribute('aria-pressed', String(stored));
 
   button.addEventListener('click', () => {
     const next = !isEditModeOn();
     document.body.classList.toggle('edit-mode', next);
     localStorage.setItem(EDIT_MODE_STORAGE_KEY, next ? 'on' : 'off');
-    button.textContent = next ? EDIT_MODE_ICONS.on : EDIT_MODE_ICONS.off;
+    button.innerHTML = next ? ICONS.wrench : ICONS.pencil;
     button.setAttribute('aria-pressed', String(next));
     onToggle();
   });
