@@ -31,7 +31,6 @@ import {
   deleteScheduleCustomBlock,
   updateScheduleCustomBlockAttachments,
 } from './schedule.js';
-import { uploadScheduleAttachment } from './storage.js';
 import { isFirebaseConfigured } from './firebaseConfig.js';
 
 const EDIT_MODE_ICONS = { off: '✏️', on: '🔧' };
@@ -141,17 +140,10 @@ function setupBudgetForm() {
   });
 }
 
-/**
- * Firebase 미설정/연결 실패 안내 배너를 표시한다.
- * @param {string} [customMessage] - 지정하면 기본 안내 문구 대신 이 메시지를 보여준다.
- */
-function showFirebaseNotice(customMessage) {
+/** Firebase 미설정/연결 실패 안내 배너를 표시한다. */
+function showFirebaseNotice() {
   const notice = document.getElementById('firebaseNotice');
   notice.hidden = false;
-  if (customMessage) {
-    notice.textContent = customMessage;
-    return;
-  }
   notice.textContent = isFirebaseConfigured
     ? '예산 서버 연결에 실패했습니다. 네트워크 상태를 확인해주세요.'
     : 'Firebase가 아직 설정되지 않았습니다. README.md의 안내에 따라 firebaseConfig.js를 설정하면 여러 기기 간 예산 공유가 활성화됩니다.';
@@ -277,17 +269,6 @@ async function main() {
       } catch (error) {
         console.error('첨부 삭제 실패', error);
         showFirebaseNotice();
-      }
-    },
-    onUploadAttachment: async (block, file) => {
-      try {
-        const url = await uploadScheduleAttachment(file, block.blockKey || block.customId);
-        await saveBlockAttachments(block, [...(block.attachments || []), { type: 'image', url, label: '' }]);
-      } catch (error) {
-        console.error('첨부 파일 업로드 실패', error);
-        showFirebaseNotice(
-          'Storage가 활성화되어 있는지 확인해주세요. 자세한 내용은 README.md를 참고하세요.',
-        );
       }
     },
   };

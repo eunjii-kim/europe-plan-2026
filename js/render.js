@@ -302,22 +302,6 @@ function renderAttachmentsSection(block, handlers, editMode) {
       form.reset();
     });
     wrapper.appendChild(form);
-
-    const fileLabel = document.createElement('label');
-    fileLabel.className = 'attachment-file-label';
-    fileLabel.textContent = '📁 사진 파일 업로드';
-    const fileInput = document.createElement('input');
-    fileInput.type = 'file';
-    fileInput.accept = 'image/*';
-    fileInput.className = 'attachment-file-input';
-    fileInput.addEventListener('change', () => {
-      const file = fileInput.files?.[0];
-      if (!file) return;
-      handlers.onUploadAttachment(block, file);
-      fileInput.value = '';
-    });
-    fileLabel.appendChild(fileInput);
-    wrapper.appendChild(fileLabel);
   }
 
   return wrapper;
