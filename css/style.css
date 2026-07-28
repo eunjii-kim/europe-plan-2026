@@ -185,8 +185,8 @@ main {
 }
 
 .toolbar-button {
-  padding: 6px var(--spacing-3);
-  min-height: var(--touch-target);
+  padding: 8px var(--spacing-3);
+  min-height: 34px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--card);
