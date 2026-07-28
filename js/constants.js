@@ -50,3 +50,9 @@ export const CATEGORY_ICONS = {
 };
 
 export const DEFAULT_CATEGORY_ICON = '💰';
+
+/** 스위스 구간에 해당하는 지역명. 이 목록에 없는 지역은 이탈리아 구간으로 간주한다. */
+export const SWISS_REGIONS = new Set(['인터라켄', '그린델발트', '융프라우', '체르마트']);
+
+/** localStorage에 라이트/다크 테마 선택값을 저장할 때 쓰는 키 */
+export const THEME_STORAGE_KEY = 'europePlan2026:theme';

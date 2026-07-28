@@ -1,4 +1,4 @@
-import { CATEGORY_ICONS, DEFAULT_CATEGORY_ICON } from './constants.js';
+import { CATEGORY_ICONS, DEFAULT_CATEGORY_ICON, SWISS_REGIONS } from './constants.js';
 import { perPersonKrw, calcPlannedTotalKrw, groupCostByCategory, calcCustomBudgetTotalKrw, formatKrw } from './budgetCalc.js';
 
 /**
@@ -34,6 +34,17 @@ export function computeDdayLabel(tripInfo, today = new Date()) {
 }
 
 /**
+ * 지역명으로 스위스/이탈리아 구간을 판별해 accent 색상 CSS 변수 이름을 반환한다.
+ * @param {string} region
+ * @returns {{ accentVar: string, bgVar: string, label: string }}
+ */
+function getCountryAccent(region) {
+  return SWISS_REGIONS.has(region)
+    ? { accentVar: '--swiss-accent', bgVar: '--swiss-accent-bg', label: '스위스' }
+    : { accentVar: '--italy-accent', bgVar: '--italy-accent-bg', label: '이탈리아' };
+}
+
+/**
  * 날짜 네비게이션(가로 스크롤 pill 목록)을 렌더링한다. 클릭하면 해당 날짜 카드로 스크롤한다.
  * @param {HTMLElement} navEl
  * @param {Array} itineraryData
@@ -41,9 +52,11 @@ export function computeDdayLabel(tripInfo, today = new Date()) {
 export function renderDayNav(navEl, itineraryData) {
   navEl.innerHTML = '';
   for (const day of itineraryData) {
+    const { accentVar } = getCountryAccent(day.region);
     const pill = document.createElement('button');
     pill.type = 'button';
     pill.className = 'day-pill';
+    pill.style.setProperty('--pill-accent', `var(${accentVar})`);
     pill.innerHTML = `<span>${day.dateLabel}</span><small>${day.region}</small>`;
     pill.addEventListener('click', () => {
       document.getElementById(day.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -65,12 +78,44 @@ function formatCostBadge(item, rates) {
 }
 
 /**
+ * 비용 항목 하나의 인라인 수정 폼을 만든다.
+ * @param {object} item
+ * @param {(key: string, values: { amount: number, currency: string, headcount: number }) => void} onEdit
+ * @returns {HTMLFormElement}
+ */
+function renderCostItemEditForm(item, onEdit) {
+  const form = document.createElement('form');
+  form.className = 'cost-item-edit-form';
+  form.innerHTML = `
+    <input type="number" name="amount" value="${item.amount}" min="0" step="1" aria-label="금액" />
+    <select name="currency" aria-label="화폐">
+      <option value="KRW" ${item.currency === 'KRW' ? 'selected' : ''}>KRW</option>
+      <option value="EUR" ${item.currency === 'EUR' ? 'selected' : ''}>EUR</option>
+      <option value="CHF" ${item.currency === 'CHF' ? 'selected' : ''}>CHF</option>
+    </select>
+    <input type="number" name="headcount" value="${item.headcount}" min="1" step="1" aria-label="인원" />
+    <button type="submit">저장</button>
+  `;
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const data = new FormData(form);
+    onEdit(item.key, {
+      amount: Number(data.get('amount')),
+      currency: data.get('currency'),
+      headcount: Number(data.get('headcount')) || 1,
+    });
+  });
+  return form;
+}
+
+/**
  * timeBlock 하나의 DOM 요소를 만든다.
  * @param {object} block
  * @param {{ CHF: number, EUR: number }} rates
+ * @param {{ onEditCostItem: Function, onResetCostItem: Function }} handlers
  * @returns {HTMLElement}
  */
-function renderTimeBlock(block, rates) {
+function renderTimeBlock(block, rates, handlers) {
   const wrapper = document.createElement('div');
   wrapper.className = 'time-block';
 
@@ -82,7 +127,7 @@ function renderTimeBlock(block, rates) {
   main.innerHTML = `
     <span class="time-block-time">${block.time}</span>
     <span class="time-block-title">${icon ? `${icon} ` : ''}${escapeHtml(block.title)}</span>
-    ${mainCostItem ? `<span class="time-block-cost">${formatCostBadge(mainCostItem, rates)}</span>` : ''}
+    ${mainCostItem ? `<span class="time-block-cost${mainCostItem.overridden ? ' is-overridden' : ''}">${formatCostBadge(mainCostItem, rates)}</span>` : ''}
   `;
   wrapper.appendChild(main);
 
@@ -113,8 +158,39 @@ function renderTimeBlock(block, rates) {
       costList.className = 'time-block-cost-detail';
       for (const item of block.costItems) {
         const li = document.createElement('li');
-        li.textContent = `${item.category}: 총 ${item.amount.toLocaleString('ko-KR')} ${item.currency} / ${item.headcount}인`;
+        li.className = 'cost-item-row';
+
+        const label = document.createElement('span');
+        label.textContent = item.overridden
+          ? `${item.category}: 총 ${item.amount.toLocaleString('ko-KR')} ${item.currency} / ${item.headcount}인 (원래 ${item.original.amount.toLocaleString('ko-KR')} ${item.original.currency})`
+          : `${item.category}: 총 ${item.amount.toLocaleString('ko-KR')} ${item.currency} / ${item.headcount}인`;
+        li.appendChild(label);
+
+        const buttonGroup = document.createElement('span');
+        const editButton = document.createElement('button');
+        editButton.type = 'button';
+        editButton.className = 'cost-item-edit-button';
+        editButton.textContent = '수정';
+        buttonGroup.appendChild(editButton);
+
+        if (item.overridden) {
+          const resetButton = document.createElement('button');
+          resetButton.type = 'button';
+          resetButton.className = 'cost-item-edit-button';
+          resetButton.textContent = '원래대로';
+          resetButton.addEventListener('click', () => handlers.onResetCostItem(item.key));
+          buttonGroup.appendChild(resetButton);
+        }
+        li.appendChild(buttonGroup);
+
+        const editForm = renderCostItemEditForm(item, handlers.onEditCostItem);
+        editForm.hidden = true;
+        editButton.addEventListener('click', () => {
+          editForm.hidden = !editForm.hidden;
+        });
+
         costList.appendChild(li);
+        costList.appendChild(editForm);
       }
       more.appendChild(costList);
     }
@@ -142,30 +218,44 @@ function escapeHtml(text) {
  * @param {Array} itineraryData
  * @param {{ CHF: number, EUR: number }} rates
  * @param {string | null} todayDayId - 오늘 날짜와 일치하는 day.id (없으면 null)
+ * @param {{ onEditCostItem: Function, onResetCostItem: Function }} handlers
  */
-export function renderDayList(listEl, itineraryData, rates, todayDayId) {
+export function renderDayList(listEl, itineraryData, rates, todayDayId, handlers) {
   listEl.innerHTML = '';
   itineraryData.forEach((day, index) => {
+    const { accentVar, bgVar } = getCountryAccent(day.region);
     const card = document.createElement('details');
     card.className = 'day-card';
     card.id = day.id;
+    card.style.setProperty('--card-accent', `var(${accentVar})`);
     if (day.id === todayDayId || (!todayDayId && index === 0)) {
       card.open = true;
     }
 
     const summary = document.createElement('summary');
     summary.className = 'day-card-summary';
-    summary.innerHTML = `<span class="day-date">${day.dateLabel}</span><span class="day-region">${day.region}</span>`;
+    summary.innerHTML = `<span class="day-date">${day.dateLabel}</span><span class="day-region" style="--region-bg: var(${bgVar}); --region-fg: var(${accentVar});">${day.region}</span>`;
     card.appendChild(summary);
 
     const blockList = document.createElement('div');
     blockList.className = 'time-block-list';
     for (const block of day.timeBlocks) {
-      blockList.appendChild(renderTimeBlock(block, rates));
+      blockList.appendChild(renderTimeBlock(block, rates, handlers));
     }
     card.appendChild(blockList);
 
     listEl.appendChild(card);
+  });
+}
+
+/**
+ * 모든 일정 카드를 펼치거나 접는다.
+ * @param {HTMLElement} listEl
+ * @param {boolean} open
+ */
+export function setAllDayCardsOpen(listEl, open) {
+  listEl.querySelectorAll('.day-card').forEach((card) => {
+    card.open = open;
   });
 }
 

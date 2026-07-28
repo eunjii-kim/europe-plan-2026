@@ -85,3 +85,37 @@ export function calcCustomBudgetTotalKrw(budgetItems, rates) {
 export function formatKrw(amount) {
   return `${Math.round(amount).toLocaleString('ko-KR')}원`;
 }
+
+/**
+ * 일정 비용 항목 하나를 Firestore 문서 ID로도 쓸 수 있는 고유 키로 변환한다.
+ * @param {string} dayId
+ * @param {number} blockIndex
+ * @param {number} itemIndex
+ * @returns {string}
+ */
+export function buildCostItemKey(dayId, blockIndex, itemIndex) {
+  return `${dayId}__${blockIndex}__${itemIndex}`;
+}
+
+/**
+ * 사용자가 수정한 값(budgetOverrides)을 원본 itineraryData에 덮어씌운 새 배열을 만든다.
+ * 각 costItem에는 key와 overridden 플래그가 함께 붙는다.
+ * @param {Array} itineraryData
+ * @param {Map<string, { amount: number, currency: string, headcount: number }>} overridesMap
+ * @returns {Array}
+ */
+export function applyBudgetOverrides(itineraryData, overridesMap) {
+  return itineraryData.map((day) => ({
+    ...day,
+    timeBlocks: day.timeBlocks.map((block, blockIndex) => ({
+      ...block,
+      costItems: (block.costItems || []).map((item, itemIndex) => {
+        const key = buildCostItemKey(day.id, blockIndex, itemIndex);
+        const override = overridesMap.get(key);
+        return override
+          ? { ...item, ...override, key, overridden: true, original: item }
+          : { ...item, key, overridden: false };
+      }),
+    })),
+  }));
+}

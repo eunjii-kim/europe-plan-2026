@@ -2,6 +2,14 @@
 
 스위스·이탈리아 2026년 유럽여행(9/26~10/18) 일정표를 웹에서 보기 편하게 정리하고, 필요한 예산을 여러 기기에서 함께 관리할 수 있는 사이트입니다.
 
+**주요 기능**
+- 날짜별 일정 카드(더보기로 상세 메모 확인), 모두 펼치기/모두 접기
+- 스위스 구간(인터라켄·그린델발트·융프라우·체르마트)과 이탈리아 구간을 다른 색상으로 구분 표시
+- CHF/EUR 실시간 환율 조회(헤더 + 예산 탭에 상시 표시), 실패 시 원본 환율로 자동 대체
+- 원래 일정표 비용 항목을 직접 수정/원상복구 가능 (기기 간 실시간 공유)
+- 추가 필요 예산 입력 (기기 간 실시간 공유)
+- 라이트/다크 모드 토글
+
 ## 로컬에서 실행하기
 
 ES 모듈(`import`/`export`)을 쓰기 때문에 `file://`로 직접 열면 CORS 오류가 납니다. 반드시 간단한 정적 서버로 실행하세요.
@@ -13,16 +21,12 @@ python3 -m http.server 8000
 
 그 후 브라우저에서 `http://localhost:8000` 접속.
 
-## 1. Firebase 설정하기 (여러 기기 예산 공유용)
+## 1. Firebase 설정 (완료됨)
 
-예산 탭의 "추가 필요 예산"을 여러 기기에서 공유하려면 Firebase Firestore를 연결해야 합니다. 아래 순서대로 진행하세요.
+`europe-plan-2026` Firebase 프로젝트가 이미 생성되어 있고 `js/firebaseConfig.js`에 설정값이 채워져 있습니다. Firestore는 서울 리전(asia-northeast3)에 프로덕션 모드로 생성되어 있으며, 아래 두 서브컬렉션만 열려 있는 보안 규칙이 게시되어 있습니다.
 
-1. [Firebase 콘솔](https://console.firebase.google.com)에서 새 프로젝트를 만듭니다. (예: `europe-plan-2026`)
-2. 왼쪽 메뉴에서 **Firestore Database** → "데이터베이스 만들기" → 리전은 `asia-northeast3 (서울)` 선택 → 프로덕션 모드로 시작.
-3. 좌측 상단 톱니바퀴(프로젝트 설정) → "내 앱" → 웹 아이콘(`</>`)으로 웹 앱 등록 → 이름은 자유롭게 입력.
-4. 등록 후 나오는 `firebaseConfig` 값을 복사합니다.
-5. `js/firebaseConfig.js` 파일을 열어 `firebaseConfig` 객체의 `YOUR_...` 부분을 방금 복사한 값으로 바꿉니다.
-6. Firestore "규칙" 탭에서 아래 규칙을 붙여넣고 게시합니다.
+- `trips/europe-plan-2026/budgetItems` — 사용자가 예산 탭에서 직접 추가한 항목
+- `trips/europe-plan-2026/budgetOverrides` — 원래 일정표 비용 항목을 수정한 값 (일정 탭의 "수정" 버튼으로 생성)
 
 ```
 rules_version = '2';
@@ -37,6 +41,17 @@ service cloud.firestore {
                     && request.resource.data.amount <= 100000000;
       allow delete: if true;
     }
+    match /trips/europe-plan-2026/budgetOverrides/{itemId} {
+      allow read: if true;
+      allow create, update: if request.resource.data.amount is number
+                    && request.resource.data.amount >= 0
+                    && request.resource.data.amount <= 100000000
+                    && request.resource.data.currency in ['KRW', 'EUR', 'CHF']
+                    && request.resource.data.headcount is number
+                    && request.resource.data.headcount >= 1
+                    && request.resource.data.headcount <= 20;
+      allow delete: if true;
+    }
     match /{document=**} {
       allow read, write: if false;
     }
@@ -46,7 +61,15 @@ service cloud.firestore {
 
 > `firebaseConfig.js`의 값들은 비밀키가 아니라 클라이언트 식별용 공개 설정값이라 깃허브에 올려도 안전합니다. 실제 접근 제어는 위 Firestore 규칙이 담당합니다. 다만 로그인 없이 누구나 쓰기가 가능한 구조이므로, 더 강한 보안이 필요하면 Firebase Anonymous Auth 도입을 고려하세요.
 
-설정을 마치지 않아도 사이트 자체(일정 보기)는 정상 동작하며, 예산 탭에는 "Firebase가 아직 설정되지 않았습니다" 안내가 표시됩니다.
+### 다른 Firebase 프로젝트로 새로 연결하고 싶다면
+
+1. [Firebase 콘솔](https://console.firebase.google.com)에서 새 프로젝트를 만듭니다.
+2. 왼쪽 메뉴에서 **Firestore Database** → "데이터베이스 만들기" → 리전은 `asia-northeast3 (서울)` 선택 → 프로덕션 모드로 시작.
+3. 좌측 상단 톱니바퀴(프로젝트 설정) → "내 앱" → 웹 아이콘(`</>`)으로 웹 앱 등록.
+4. 등록 후 나오는 `firebaseConfig` 값을 `js/firebaseConfig.js`에 붙여넣습니다.
+5. Firestore "규칙" 탭에서 위 규칙을 붙여넣고 게시합니다.
+
+설정 전(또는 연결 실패 시)에도 사이트 자체(일정 보기)는 정상 동작하며, 예산 탭에는 안내 배너가 표시됩니다.
 
 ## 2. GitHub Pages로 배포하기
 

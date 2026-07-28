@@ -1,13 +1,28 @@
+/*
+ * 색상 토큰은 shadcn/ui의 기본 Neutral 테마(oklch)를 그대로 가져왔다.
+ * https://ui.shadcn.com/create 의 Style: Nova / Base Color: Neutral 기준.
+ * primary는 neutral 회색 대신 파란색 브랜드 색을 얹어 인터랙션 요소를 구분했다.
+ */
 :root {
-  --color-bg: #fafafa;
-  --color-surface: #ffffff;
-  --color-text: #1f2937;
-  --color-text-muted: #6b7280;
-  --color-primary: #2563eb;
-  --color-primary-light: #dbeafe;
-  --color-border: #e5e7eb;
-  --color-danger: #dc2626;
-  --radius: 12px;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --border: oklch(0.922 0 0);
+  --primary: #2563eb;
+  --primary-foreground: #ffffff;
+  --primary-muted: oklch(0.933 0.032 255 / 20%);
+  --danger: #dc2626;
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+
+  --radius: 0.625rem;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-pill: 999px;
+
   --spacing-1: 4px;
   --spacing-2: 8px;
   --spacing-3: 12px;
@@ -15,18 +30,50 @@
   --spacing-5: 24px;
   --max-width: 720px;
   --touch-target: 44px;
+
+  /* 스위스/이탈리아 구간 색조 (라이트) */
+  --swiss-accent: #dc2626;
+  --swiss-accent-bg: oklch(0.94 0.03 25);
+  --italy-accent: #16a34a;
+  --italy-accent-bg: oklch(0.94 0.05 145);
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    --color-bg: #111827;
-    --color-surface: #1f2937;
-    --color-text: #f3f4f6;
-    --color-text-muted: #9ca3af;
-    --color-primary: #60a5fa;
-    --color-primary-light: #1e3a5f;
-    --color-border: #374151;
+  :root:not([data-theme='light']) {
+    --background: oklch(0.145 0 0);
+    --foreground: oklch(0.985 0 0);
+    --card: oklch(0.205 0 0);
+    --card-foreground: oklch(0.985 0 0);
+    --muted: oklch(0.269 0 0);
+    --muted-foreground: oklch(0.708 0 0);
+    --border: oklch(1 0 0 / 10%);
+    --primary: #60a5fa;
+    --primary-foreground: oklch(0.205 0 0);
+    --primary-muted: oklch(0.6 0.12 255 / 18%);
+
+    --swiss-accent: #f87171;
+    --swiss-accent-bg: oklch(0.32 0.05 25);
+    --italy-accent: #4ade80;
+    --italy-accent-bg: oklch(0.32 0.06 145);
   }
+}
+
+:root[data-theme='dark'] {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --border: oklch(1 0 0 / 10%);
+  --primary: #60a5fa;
+  --primary-foreground: oklch(0.205 0 0);
+  --primary-muted: oklch(0.6 0.12 255 / 18%);
+
+  --swiss-accent: #f87171;
+  --swiss-accent-bg: oklch(0.32 0.05 25);
+  --italy-accent: #4ade80;
+  --italy-accent-bg: oklch(0.32 0.06 145);
 }
 
 * {
@@ -35,12 +82,13 @@
 
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
-  background: var(--color-bg);
-  color: var(--color-text);
+  font-family: var(--font-sans);
+  background: var(--background);
+  color: var(--foreground);
 }
 
 .app-header {
+  position: relative;
   padding: var(--spacing-5) var(--spacing-4) var(--spacing-3);
   text-align: center;
 }
@@ -52,7 +100,7 @@ body {
 
 .trip-sub {
   margin: var(--spacing-1) 0;
-  color: var(--color-text-muted);
+  color: var(--muted-foreground);
   font-size: 0.9rem;
 }
 
@@ -60,11 +108,31 @@ body {
   display: inline-block;
   margin-top: var(--spacing-2);
   padding: 4px 12px;
-  background: var(--color-primary-light);
-  color: var(--color-primary);
-  border-radius: 999px;
+  background: var(--primary-muted);
+  color: var(--primary);
+  border-radius: var(--radius-pill);
   font-weight: 600;
   font-size: 0.85rem;
+}
+
+.header-rate-status {
+  margin: var(--spacing-2) 0 0;
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+}
+
+.theme-toggle {
+  position: absolute;
+  top: var(--spacing-3);
+  right: var(--spacing-3);
+  min-width: var(--touch-target);
+  min-height: var(--touch-target);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--card);
+  color: var(--foreground);
+  font-size: 1.1rem;
+  cursor: pointer;
 }
 
 .tab-bar {
@@ -72,8 +140,8 @@ body {
   top: 0;
   z-index: 10;
   display: flex;
-  background: var(--color-surface);
-  border-bottom: 1px solid var(--color-border);
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
 }
 
 .tab-button {
@@ -81,22 +149,42 @@ body {
   padding: var(--spacing-3);
   border: none;
   background: none;
+  font-family: var(--font-sans);
   font-size: 1rem;
-  color: var(--color-text-muted);
+  color: var(--muted-foreground);
   cursor: pointer;
   min-height: var(--touch-target);
 }
 
 .tab-button[aria-selected='true'] {
-  color: var(--color-primary);
+  color: var(--primary);
   font-weight: 700;
-  border-bottom: 2px solid var(--color-primary);
+  border-bottom: 2px solid var(--primary);
 }
 
 main {
   max-width: var(--max-width);
   margin: 0 auto;
   padding: var(--spacing-4);
+}
+
+.schedule-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacing-2);
+  margin-bottom: var(--spacing-2);
+}
+
+.toolbar-button {
+  padding: 6px var(--spacing-3);
+  min-height: var(--touch-target);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  cursor: pointer;
 }
 
 .day-nav {
@@ -107,7 +195,7 @@ main {
   gap: var(--spacing-2);
   overflow-x: auto;
   padding: var(--spacing-2) 0 var(--spacing-3);
-  background: var(--color-bg);
+  background: var(--background);
   scroll-snap-type: x proximity;
   -webkit-overflow-scrolling: touch;
 }
@@ -122,15 +210,17 @@ main {
   padding: var(--spacing-2) var(--spacing-3);
   min-height: var(--touch-target);
   border-radius: var(--radius);
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-text);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--pill-accent, var(--border));
+  background: var(--card);
+  color: var(--foreground);
+  font-family: var(--font-sans);
   font-size: 0.8rem;
   cursor: pointer;
 }
 
 .day-pill small {
-  color: var(--color-text-muted);
+  color: var(--muted-foreground);
   font-size: 0.7rem;
 }
 
@@ -141,8 +231,10 @@ main {
 }
 
 .day-card {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
+  background: var(--card);
+  color: var(--card-foreground);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--card-accent, var(--border));
   border-radius: var(--radius);
   padding: var(--spacing-3);
   scroll-margin-top: 110px;
@@ -166,8 +258,15 @@ main {
 }
 
 .day-region {
-  color: var(--color-primary);
-  font-size: 0.9rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--region-bg, var(--muted));
+  color: var(--region-fg, var(--muted-foreground));
+  font-size: 0.8rem;
+  font-weight: 600;
 }
 
 .time-block-list {
@@ -178,13 +277,13 @@ main {
 }
 
 .time-block {
-  border-top: 1px solid var(--color-border);
+  border-top: 1px solid var(--border);
   padding-top: var(--spacing-2);
 }
 
 .location-tag {
   font-size: 0.75rem;
-  color: var(--color-text-muted);
+  color: var(--muted-foreground);
   margin-bottom: 2px;
 }
 
@@ -197,7 +296,7 @@ main {
 
 .time-block-time {
   font-variant-numeric: tabular-nums;
-  color: var(--color-text-muted);
+  color: var(--muted-foreground);
   font-size: 0.85rem;
   min-width: 44px;
 }
@@ -210,8 +309,14 @@ main {
 
 .time-block-cost {
   font-size: 0.8rem;
-  color: var(--color-primary);
+  color: var(--primary);
   white-space: nowrap;
+}
+
+.time-block-cost.is-overridden::after {
+  content: ' (수정됨)';
+  color: var(--muted-foreground);
+  font-weight: 400;
 }
 
 .time-block-more {
@@ -220,7 +325,7 @@ main {
 
 .time-block-more summary {
   cursor: pointer;
-  color: var(--color-text-muted);
+  color: var(--muted-foreground);
   font-size: 0.8rem;
   min-height: var(--touch-target);
   display: flex;
@@ -230,27 +335,83 @@ main {
 .time-block-note {
   white-space: pre-line;
   font-size: 0.85rem;
-  color: var(--color-text-muted);
+  color: var(--muted-foreground);
   margin: var(--spacing-1) 0;
 }
 
 .time-block-cost-detail {
   margin: var(--spacing-1) 0 0;
-  padding-left: 1.2em;
+  padding: 0;
+  list-style: none;
   font-size: 0.8rem;
-  color: var(--color-text-muted);
+  color: var(--muted-foreground);
 }
 
-.rate-status {
+.cost-item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-2);
+  padding: var(--spacing-1) 0;
+}
+
+.cost-item-edit-button {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--foreground);
+  font-size: 0.75rem;
+  padding: 2px 8px;
+  cursor: pointer;
+  min-height: 28px;
+}
+
+.cost-item-edit-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-1);
+  align-items: center;
+  margin: var(--spacing-1) 0;
+}
+
+.cost-item-edit-form input,
+.cost-item-edit-form select {
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--background);
+  color: var(--foreground);
   font-size: 0.8rem;
-  color: var(--color-text-muted);
+  width: 90px;
+}
+
+.cost-item-edit-form button {
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-size: 0.75rem;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.cost-item-edit-form button.secondary {
+  background: var(--card);
+  color: var(--foreground);
+}
+
+.rate-status,
+.header-rate-status {
+  font-size: 0.8rem;
+  color: var(--muted-foreground);
   text-align: center;
 }
 
 .budget-summary,
 .budget-custom {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
+  background: var(--card);
+  color: var(--card-foreground);
+  border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: var(--spacing-4);
   margin-top: var(--spacing-3);
@@ -276,7 +437,7 @@ main {
 }
 
 .hint {
-  color: var(--color-text-muted);
+  color: var(--muted-foreground);
   font-size: 0.85rem;
 }
 
@@ -284,12 +445,17 @@ main {
   background: #fef3c7;
   color: #92400e;
   padding: var(--spacing-2) var(--spacing-3);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   font-size: 0.85rem;
 }
 
+:root[data-theme='dark'] .firebase-notice {
+  background: #3f2d05;
+  color: #fcd34d;
+}
+
 @media (prefers-color-scheme: dark) {
-  .firebase-notice {
+  :root:not([data-theme='light']) .firebase-notice {
     background: #3f2d05;
     color: #fcd34d;
   }
@@ -316,17 +482,18 @@ main {
 .budget-form select,
 .budget-form button {
   padding: var(--spacing-2);
-  border-radius: 8px;
-  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
   min-height: var(--touch-target);
+  font-family: var(--font-sans);
   font-size: 1rem;
-  background: var(--color-bg);
-  color: var(--color-text);
+  background: var(--background);
+  color: var(--foreground);
 }
 
 .budget-form button {
-  background: var(--color-primary);
-  color: #fff;
+  background: var(--primary);
+  color: var(--primary-foreground);
   border: none;
   cursor: pointer;
   padding-inline: var(--spacing-4);
@@ -347,12 +514,12 @@ main {
   justify-content: space-between;
   gap: var(--spacing-2);
   padding: var(--spacing-2);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
 }
 
 .budget-item-amount {
-  color: var(--color-text-muted);
+  color: var(--muted-foreground);
   font-size: 0.85rem;
   white-space: nowrap;
 }
@@ -362,13 +529,13 @@ main {
   min-height: var(--touch-target);
   border: none;
   background: none;
-  color: var(--color-danger);
+  color: var(--danger);
   font-size: 1.1rem;
   cursor: pointer;
 }
 
 .budget-list-empty {
-  color: var(--color-text-muted);
+  color: var(--muted-foreground);
   font-size: 0.85rem;
   text-align: center;
   padding: var(--spacing-3);
@@ -380,8 +547,8 @@ main {
   text-align: center;
   margin-top: var(--spacing-4);
   padding: var(--spacing-3);
-  background: var(--color-primary-light);
-  color: var(--color-primary);
+  background: var(--primary-muted);
+  color: var(--primary);
   border-radius: var(--radius);
 }
 

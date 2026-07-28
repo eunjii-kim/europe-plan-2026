@@ -1,16 +1,24 @@
 import { itineraryData } from './data.js';
-import { TRIP_INFO } from './constants.js';
+import { TRIP_INFO, THEME_STORAGE_KEY } from './constants.js';
 import { getExchangeRates } from './exchangeRate.js';
 import {
   computeDdayLabel,
   renderDayNav,
   renderDayList,
+  setAllDayCardsOpen,
   renderRateStatus,
   renderBudgetSummary,
   renderBudgetList,
 } from './render.js';
-import { formatKrw } from './budgetCalc.js';
-import { subscribeToBudgetItems, addBudgetItem, deleteBudgetItem } from './budget.js';
+import { formatKrw, applyBudgetOverrides } from './budgetCalc.js';
+import {
+  subscribeToBudgetItems,
+  addBudgetItem,
+  deleteBudgetItem,
+  subscribeToBudgetOverrides,
+  setBudgetOverride,
+  clearBudgetOverride,
+} from './budget.js';
 import { isFirebaseConfigured } from './firebaseConfig.js';
 
 /**
@@ -37,6 +45,34 @@ function setupTabs() {
         panel.hidden = key !== button.dataset.tab;
       });
     });
+  });
+}
+
+/** 라이트/다크 모드 토글 버튼을 연결한다. 선택값은 localStorage에 저장해 다음 방문에도 유지한다. */
+function setupThemeToggle() {
+  const root = document.documentElement;
+  const stored = localStorage.getItem(THEME_STORAGE_KEY);
+  if (stored === 'light' || stored === 'dark') {
+    root.dataset.theme = stored;
+  }
+
+  document.getElementById('themeToggle').addEventListener('click', () => {
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const current = root.dataset.theme || (prefersDark ? 'dark' : 'light');
+    const next = current === 'dark' ? 'light' : 'dark';
+    root.dataset.theme = next;
+    localStorage.setItem(THEME_STORAGE_KEY, next);
+  });
+}
+
+/** 일정 탭의 모두 펼치기/모두 접기 버튼을 연결한다. */
+function setupExpandCollapseButtons() {
+  const dayList = document.getElementById('dayList');
+  document.getElementById('expandAllButton').addEventListener('click', () => {
+    setAllDayCardsOpen(dayList, true);
+  });
+  document.getElementById('collapseAllButton').addEventListener('click', () => {
+    setAllDayCardsOpen(dayList, false);
   });
 }
 
@@ -79,52 +115,85 @@ async function main() {
   document.getElementById('ddayLabel').textContent = computeDdayLabel(TRIP_INFO);
 
   setupTabs();
+  setupThemeToggle();
+  setupExpandCollapseButtons();
   setupBudgetForm();
 
   const rateStatusEl = document.getElementById('rateStatus');
+  const headerRateStatusEl = document.getElementById('headerRateStatus');
   rateStatusEl.textContent = '환율 정보를 불러오는 중...';
 
   const rates = await getExchangeRates();
   renderRateStatus(rateStatusEl, rates);
+  renderRateStatus(headerRateStatusEl, rates);
 
   const todayId = `d${toIsoDate(new Date())}`;
   const todayDayId = itineraryData.some((day) => day.id === todayId) ? todayId : null;
 
-  renderDayNav(document.getElementById('dayNav'), itineraryData);
-  renderDayList(document.getElementById('dayList'), itineraryData, rates, todayDayId);
-
-  const plannedTotal = renderBudgetSummary(
-    document.getElementById('categoryBreakdown'),
-    document.getElementById('plannedTotal'),
-    itineraryData,
-    rates,
-  );
-
+  const dayListEl = document.getElementById('dayList');
   const grandTotalEl = document.getElementById('grandTotal');
-  const updateGrandTotal = (customTotal) => {
+
+  let plannedTotal = 0;
+  let customTotal = 0;
+  const updateGrandTotal = () => {
     grandTotalEl.textContent = `전체 예상 총액: ${formatKrw(plannedTotal + customTotal)}`;
   };
-  updateGrandTotal(0);
+
+  const costItemHandlers = {
+    onEditCostItem: async (key, values) => {
+      try {
+        await setBudgetOverride(key, values);
+      } catch (error) {
+        console.error('일정 비용 수정 실패', error);
+        showFirebaseNotice();
+      }
+    },
+    onResetCostItem: async (key) => {
+      try {
+        await clearBudgetOverride(key);
+      } catch (error) {
+        console.error('일정 비용 초기화 실패', error);
+        showFirebaseNotice();
+      }
+    },
+  };
+
+  const renderScheduleAndSummary = (overridesMap) => {
+    const effectiveData = applyBudgetOverrides(itineraryData, overridesMap);
+    renderDayNav(document.getElementById('dayNav'), effectiveData);
+    renderDayList(dayListEl, effectiveData, rates, todayDayId, costItemHandlers);
+    plannedTotal = renderBudgetSummary(
+      document.getElementById('categoryBreakdown'),
+      document.getElementById('plannedTotal'),
+      effectiveData,
+      rates,
+    );
+    updateGrandTotal();
+  };
+
+  // Firestore 연결 여부와 상관없이 일정/예산 요약은 항상 먼저 보여준다.
+  renderScheduleAndSummary(new Map());
 
   if (!isFirebaseConfigured) {
     showFirebaseNotice();
+  } else {
+    subscribeToBudgetOverrides(renderScheduleAndSummary, () => showFirebaseNotice());
+    subscribeToBudgetItems(
+      (items) => {
+        customTotal = renderBudgetList(document.getElementById('budgetList'), items, rates, async (id) => {
+          try {
+            await deleteBudgetItem(id);
+          } catch (error) {
+            console.error('예산 항목 삭제 실패', error);
+            showFirebaseNotice();
+          }
+        });
+        document.getElementById('customTotal').textContent = `추가 예산 합계: ${formatKrw(customTotal)}`;
+        updateGrandTotal();
+      },
+      () => showFirebaseNotice(),
+    );
   }
-
-  subscribeToBudgetItems(
-    (items) => {
-      const customTotal = renderBudgetList(document.getElementById('budgetList'), items, rates, async (id) => {
-        try {
-          await deleteBudgetItem(id);
-        } catch (error) {
-          console.error('예산 항목 삭제 실패', error);
-          showFirebaseNotice();
-        }
-      });
-      document.getElementById('customTotal').textContent = `추가 예산 합계: ${formatKrw(customTotal)}`;
-      updateGrandTotal(customTotal);
-    },
-    () => showFirebaseNotice(),
-  );
 }
 
 main();

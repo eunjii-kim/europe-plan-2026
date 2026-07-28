@@ -9,9 +9,11 @@
 </head>
 <body>
   <header class="app-header">
+    <button type="button" id="themeToggle" class="theme-toggle" aria-label="라이트/다크 모드 전환">🌓</button>
     <h1 id="tripTitle"></h1>
     <p id="tripSub" class="trip-sub"></p>
     <p id="ddayLabel" class="dday"></p>
+    <p id="headerRateStatus" class="header-rate-status"></p>
   </header>
 
   <nav class="tab-bar" role="tablist">
@@ -21,6 +23,10 @@
 
   <main>
     <section id="scheduleTab" class="tab-panel">
+      <div class="schedule-toolbar">
+        <button type="button" id="expandAllButton" class="toolbar-button">모두 펼치기</button>
+        <button type="button" id="collapseAllButton" class="toolbar-button">모두 접기</button>
+      </div>
       <nav id="dayNav" class="day-nav" aria-label="날짜 이동"></nav>
       <div id="dayList" class="day-list"></div>
     </section>

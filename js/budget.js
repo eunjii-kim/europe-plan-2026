@@ -6,8 +6,9 @@ import {
   orderBy,
   query,
   serverTimestamp,
-} from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
-import { budgetItemsCollection } from './firebaseConfig.js';
+  setDoc,
+} from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js';
+import { budgetItemsCollection, budgetOverridesCollection } from './firebaseConfig.js';
 
 /**
  * 사용자가 추가한 예산 항목 목록을 실시간으로 구독한다.
@@ -52,4 +53,51 @@ export async function addBudgetItem(item) {
  */
 export async function deleteBudgetItem(itemId) {
   await deleteDoc(doc(budgetItemsCollection, itemId));
+}
+
+/**
+ * 기존 일정 비용 항목의 수정값(budgetOverrides)을 실시간으로 구독한다.
+ * @param {(overridesMap: Map<string, { amount: number, currency: string, headcount: number }>) => void} onChange
+ * @param {(error: Error) => void} onError
+ * @returns {() => void} 구독 해제 함수
+ */
+export function subscribeToBudgetOverrides(onChange, onError) {
+  return onSnapshot(
+    budgetOverridesCollection,
+    (snapshot) => {
+      const overridesMap = new Map();
+      snapshot.docs.forEach((docSnap) => {
+        overridesMap.set(docSnap.id, docSnap.data());
+      });
+      onChange(overridesMap);
+    },
+    (error) => {
+      console.error('일정 비용 수정값 구독 실패', error);
+      onError(error);
+    },
+  );
+}
+
+/**
+ * 기존 일정 비용 항목을 사용자가 지정한 값으로 덮어쓴다.
+ * @param {string} key - buildCostItemKey로 만든 항목 키
+ * @param {{ amount: number, currency: string, headcount: number }} values
+ * @returns {Promise<void>}
+ */
+export async function setBudgetOverride(key, values) {
+  await setDoc(doc(budgetOverridesCollection, key), {
+    amount: values.amount,
+    currency: values.currency,
+    headcount: values.headcount,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+/**
+ * 기존 일정 비용 항목의 수정값을 삭제해 원래 값으로 되돌린다.
+ * @param {string} key
+ * @returns {Promise<void>}
+ */
+export async function clearBudgetOverride(key) {
+  await deleteDoc(doc(budgetOverridesCollection, key));
 }
