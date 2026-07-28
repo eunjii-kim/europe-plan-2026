@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>2026 유럽여행</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="app-header">
+    <h1 id="tripTitle"></h1>
+    <p id="tripSub" class="trip-sub"></p>
+    <p id="ddayLabel" class="dday"></p>
+  </header>
+
+  <nav class="tab-bar" role="tablist">
+    <button type="button" class="tab-button" data-tab="schedule" aria-selected="true">일정</button>
+    <button type="button" class="tab-button" data-tab="budget" aria-selected="false">예산</button>
+  </nav>
+
+  <main>
+    <section id="scheduleTab" class="tab-panel">
+      <nav id="dayNav" class="day-nav" aria-label="날짜 이동"></nav>
+      <div id="dayList" class="day-list"></div>
+    </section>
+
+    <section id="budgetTab" class="tab-panel" hidden>
+      <p id="rateStatus" class="rate-status"></p>
+
+      <div class="budget-summary">
+        <h2>예정 비용 (1인 기준)</h2>
+        <div id="categoryBreakdown" class="category-breakdown"></div>
+        <p id="plannedTotal" class="total-line"></p>
+      </div>
+
+      <div class="budget-custom">
+        <h2>추가 필요 예산</h2>
+        <p class="hint">여기 추가한 항목은 다른 기기와 실시간으로 공유됩니다.</p>
+        <p id="firebaseNotice" class="firebase-notice" hidden></p>
+
+        <form id="budgetForm" class="budget-form">
+          <input id="budgetTitleInput" type="text" placeholder="항목명 (예: 기념품)" required maxlength="100" />
+          <input id="budgetAmountInput" type="number" placeholder="금액" required min="0" step="1" />
+          <select id="budgetCurrencyInput">
+            <option value="KRW">KRW</option>
+            <option value="EUR">EUR</option>
+            <option value="CHF">CHF</option>
+          </select>
+          <button type="submit">추가</button>
+        </form>
+
+        <ul id="budgetList" class="budget-list"></ul>
+        <p id="customTotal" class="total-line"></p>
+      </div>
+
+      <p id="grandTotal" class="grand-total"></p>
+    </section>
+  </main>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
