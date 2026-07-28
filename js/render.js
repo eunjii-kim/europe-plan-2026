@@ -535,7 +535,7 @@ export function renderRateStatus(el, rateInfo) {
   const timeLabel = rateInfo.fetchedAt
     ? new Date(rateInfo.fetchedAt).toLocaleString('ko-KR')
     : '조회 불가';
-  el.textContent = `환율: 1 CHF ≈ ${Math.round(rateInfo.CHF).toLocaleString('ko-KR')}원, 1 EUR ≈ ${Math.round(rateInfo.EUR).toLocaleString('ko-KR')}원 · ${label} (${timeLabel})`;
+  el.textContent = `환율: 🇨🇭 1 CHF ≈ ${Math.round(rateInfo.CHF).toLocaleString('ko-KR')}원, 🇮🇹 1 EUR ≈ ${Math.round(rateInfo.EUR).toLocaleString('ko-KR')}원 · ${label} (${timeLabel})`;
 }
 
 /**
@@ -544,7 +544,7 @@ export function renderRateStatus(el, rateInfo) {
  * @param {{ CHF: number, EUR: number }} rateInfo
  */
 export function renderRateStatusCompact(el, rateInfo) {
-  el.textContent = `CHF ${Math.round(rateInfo.CHF).toLocaleString('ko-KR')}원 · EUR ${Math.round(rateInfo.EUR).toLocaleString('ko-KR')}원`;
+  el.textContent = `🇨🇭 CHF ${Math.round(rateInfo.CHF).toLocaleString('ko-KR')}원 · 🇮🇹 EUR ${Math.round(rateInfo.EUR).toLocaleString('ko-KR')}원`;
 }
 
 /**
