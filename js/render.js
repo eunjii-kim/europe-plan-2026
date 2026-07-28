@@ -274,6 +274,15 @@ export function renderRateStatus(el, rateInfo) {
 }
 
 /**
+ * 헤더에 D-day 옆에 작게 표시할 환율 요약(출처/시각 라벨 없이 숫자만)을 렌더링한다.
+ * @param {HTMLElement} el
+ * @param {{ CHF: number, EUR: number }} rateInfo
+ */
+export function renderRateStatusCompact(el, rateInfo) {
+  el.textContent = `CHF ${Math.round(rateInfo.CHF).toLocaleString('ko-KR')}원 · EUR ${Math.round(rateInfo.EUR).toLocaleString('ko-KR')}원`;
+}
+
+/**
  * 예정 비용(카테고리별 소계 + 총합)을 렌더링한다.
  * @param {HTMLElement} breakdownEl
  * @param {HTMLElement} totalEl

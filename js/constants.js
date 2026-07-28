@@ -21,8 +21,11 @@ export const FALLBACK_EXCHANGE_RATES = {
   EUR: 1710,
 };
 
-/** 실시간 환율 캐시 유효 시간(밀리초). 6시간. */
-export const EXCHANGE_RATE_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+/** 실시간 환율 캐시 유효 시간(밀리초). 1시간. */
+export const EXCHANGE_RATE_CACHE_TTL_MS = 60 * 60 * 1000;
+
+/** 헤더 환율 표시 자동 갱신 주기(밀리초). 1시간. */
+export const EXCHANGE_RATE_REFRESH_INTERVAL_MS = 60 * 60 * 1000;
 
 /** 실시간 환율 조회용 무료 공개 API (키 불필요, KRW 기준 환율표 반환) */
 export const EXCHANGE_RATE_API_URL = 'https://open.er-api.com/v6/latest/KRW';

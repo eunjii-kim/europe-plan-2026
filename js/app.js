@@ -1,5 +1,5 @@
 import { itineraryData } from './data.js';
-import { TRIP_INFO, THEME_STORAGE_KEY } from './constants.js';
+import { TRIP_INFO, THEME_STORAGE_KEY, EXCHANGE_RATE_REFRESH_INTERVAL_MS } from './constants.js';
 import { getExchangeRates } from './exchangeRate.js';
 import {
   computeDdayLabel,
@@ -7,6 +7,7 @@ import {
   renderDayList,
   setAllDayCardsOpen,
   renderRateStatus,
+  renderRateStatusCompact,
   renderBudgetSummary,
   renderBudgetList,
 } from './render.js';
@@ -123,9 +124,9 @@ async function main() {
   const headerRateStatusEl = document.getElementById('headerRateStatus');
   rateStatusEl.textContent = '환율 정보를 불러오는 중...';
 
-  const rates = await getExchangeRates();
+  let rates = await getExchangeRates();
   renderRateStatus(rateStatusEl, rates);
-  renderRateStatus(headerRateStatusEl, rates);
+  renderRateStatusCompact(headerRateStatusEl, rates);
 
   const todayId = `d${toIsoDate(new Date())}`;
   const todayDayId = itineraryData.some((day) => day.id === todayId) ? todayId : null;
@@ -158,7 +159,9 @@ async function main() {
     },
   };
 
+  let latestOverridesMap = new Map();
   const renderScheduleAndSummary = (overridesMap) => {
+    latestOverridesMap = overridesMap;
     const effectiveData = applyBudgetOverrides(itineraryData, overridesMap);
     renderDayNav(document.getElementById('dayNav'), effectiveData);
     renderDayList(dayListEl, effectiveData, rates, todayDayId, costItemHandlers);
@@ -171,6 +174,31 @@ async function main() {
     updateGrandTotal();
   };
 
+  let latestBudgetItems = [];
+  const renderCustomBudgetList = (items) => {
+    latestBudgetItems = items;
+    customTotal = renderBudgetList(document.getElementById('budgetList'), items, rates, async (id) => {
+      try {
+        await deleteBudgetItem(id);
+      } catch (error) {
+        console.error('예산 항목 삭제 실패', error);
+        showFirebaseNotice();
+      }
+    });
+    document.getElementById('customTotal').textContent = `추가 예산 합계: ${formatKrw(customTotal)}`;
+    updateGrandTotal();
+  };
+
+  /** 환율을 다시 조회하고, 환율에 의존하는 모든 화면(헤더/일정/예산)을 재렌더링한다. */
+  async function refreshRates() {
+    rates = await getExchangeRates();
+    renderRateStatus(rateStatusEl, rates);
+    renderRateStatusCompact(headerRateStatusEl, rates);
+    renderScheduleAndSummary(latestOverridesMap);
+    renderCustomBudgetList(latestBudgetItems);
+  }
+  setInterval(refreshRates, EXCHANGE_RATE_REFRESH_INTERVAL_MS);
+
   // Firestore 연결 여부와 상관없이 일정/예산 요약은 항상 먼저 보여준다.
   renderScheduleAndSummary(new Map());
 
@@ -178,21 +206,7 @@ async function main() {
     showFirebaseNotice();
   } else {
     subscribeToBudgetOverrides(renderScheduleAndSummary, () => showFirebaseNotice());
-    subscribeToBudgetItems(
-      (items) => {
-        customTotal = renderBudgetList(document.getElementById('budgetList'), items, rates, async (id) => {
-          try {
-            await deleteBudgetItem(id);
-          } catch (error) {
-            console.error('예산 항목 삭제 실패', error);
-            showFirebaseNotice();
-          }
-        });
-        document.getElementById('customTotal').textContent = `추가 예산 합계: ${formatKrw(customTotal)}`;
-        updateGrandTotal();
-      },
-      () => showFirebaseNotice(),
-    );
+    subscribeToBudgetItems(renderCustomBudgetList, () => showFirebaseNotice());
   }
 }
 
