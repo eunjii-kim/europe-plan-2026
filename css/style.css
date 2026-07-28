@@ -130,10 +130,15 @@ body {
   font-size: 0.72rem;
 }
 
-.theme-toggle {
+.header-actions {
   position: absolute;
   top: var(--spacing-3);
   right: var(--spacing-3);
+  display: flex;
+  gap: var(--spacing-2);
+}
+
+.icon-toggle-button {
   min-width: var(--touch-target);
   min-height: var(--touch-target);
   border: 1px solid var(--border);
@@ -142,6 +147,12 @@ body {
   color: var(--foreground);
   font-size: 1.1rem;
   cursor: pointer;
+}
+
+.icon-toggle-button[aria-pressed='true'] {
+  background: var(--primary-muted);
+  color: var(--primary);
+  border-color: var(--primary);
 }
 
 .tab-bar {
@@ -340,6 +351,149 @@ main {
   content: ' (수정됨)';
   color: var(--muted-foreground);
   font-weight: 400;
+}
+
+.time-block-title.is-overridden::after {
+  content: ' (수정됨)';
+  color: var(--muted-foreground);
+  font-weight: 400;
+  font-size: 0.75rem;
+}
+
+.time-block-edit-controls {
+  display: flex;
+  gap: var(--spacing-1);
+  margin-left: auto;
+}
+
+.time-block-icon-button {
+  min-width: 28px;
+  min-height: 28px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--foreground);
+  font-size: 0.85rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.time-block-delete-button {
+  color: var(--danger);
+}
+
+.time-block-edit-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-1);
+  align-items: flex-start;
+  margin-top: var(--spacing-1);
+}
+
+.time-block-edit-form input[type='text'] {
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--background);
+  color: var(--foreground);
+  font-size: 0.8rem;
+}
+
+.time-block-edit-form input[name='time'] {
+  width: 90px;
+}
+
+.time-block-edit-form input[name='title'] {
+  flex: 1;
+  min-width: 120px;
+}
+
+.time-block-edit-form textarea {
+  flex-basis: 100%;
+  min-height: 50px;
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  resize: vertical;
+}
+
+.time-block-edit-form button {
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-size: 0.75rem;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.add-block-section {
+  margin-top: var(--spacing-2);
+  padding-top: var(--spacing-2);
+  border-top: 1px dashed var(--border);
+}
+
+.add-block-button {
+  padding: 6px var(--spacing-3);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--primary);
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.add-block-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-1);
+  margin-top: var(--spacing-2);
+}
+
+.add-block-form input[type='text'] {
+  padding: var(--spacing-1) var(--spacing-2);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--background);
+  color: var(--foreground);
+  font-size: 0.85rem;
+}
+
+.add-block-form input[name='time'] {
+  width: 100px;
+}
+
+.add-block-form input[name='title'] {
+  flex: 1;
+  min-width: 140px;
+}
+
+.add-block-form textarea {
+  flex-basis: 100%;
+  min-height: 50px;
+  padding: var(--spacing-1) var(--spacing-2);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  resize: vertical;
+}
+
+.add-block-form button {
+  border-radius: var(--radius-sm);
+  border: none;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-size: 0.85rem;
+  padding: var(--spacing-1) var(--spacing-3);
+  cursor: pointer;
 }
 
 .time-block-more {

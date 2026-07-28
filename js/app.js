@@ -1,5 +1,5 @@
 import { itineraryData } from './data.js';
-import { TRIP_INFO, THEME_STORAGE_KEY, EXCHANGE_RATE_REFRESH_INTERVAL_MS } from './constants.js';
+import { TRIP_INFO, THEME_STORAGE_KEY, EDIT_MODE_STORAGE_KEY, EXCHANGE_RATE_REFRESH_INTERVAL_MS } from './constants.js';
 import { getExchangeRates } from './exchangeRate.js';
 import {
   computeDdayLabel,
@@ -12,6 +12,7 @@ import {
   renderBudgetList,
 } from './render.js';
 import { formatKrw, applyBudgetOverrides } from './budgetCalc.js';
+import { applyScheduleOverrides } from './scheduleCalc.js';
 import { setupScrollSpy } from './scrollSpy.js';
 import {
   subscribeToBudgetItems,
@@ -21,7 +22,17 @@ import {
   setBudgetOverride,
   clearBudgetOverride,
 } from './budget.js';
+import {
+  subscribeToScheduleOverrides,
+  setScheduleOverride,
+  clearScheduleOverride,
+  subscribeToScheduleCustomBlocks,
+  addScheduleCustomBlock,
+  deleteScheduleCustomBlock,
+} from './schedule.js';
 import { isFirebaseConfigured } from './firebaseConfig.js';
+
+const EDIT_MODE_ICONS = { off: '✏️', on: '🔧' };
 
 /**
  * 오늘 날짜를 시간대 이슈 없이 'YYYY-MM-DD' 문자열로 변환한다.
@@ -64,6 +75,32 @@ function setupThemeToggle() {
     const next = current === 'dark' ? 'light' : 'dark';
     root.dataset.theme = next;
     localStorage.setItem(THEME_STORAGE_KEY, next);
+  });
+}
+
+/** 현재 편집모드가 켜져 있는지 확인한다. */
+function isEditModeOn() {
+  return document.body.classList.contains('edit-mode');
+}
+
+/**
+ * 편집모드 토글 버튼을 연결한다. 선택값은 localStorage에 저장해 다음 방문에도 유지한다.
+ * @param {() => void} onToggle - 켜짐/꺼짐이 바뀔 때마다 화면을 다시 그리기 위한 콜백
+ */
+function setupEditModeToggle(onToggle) {
+  const button = document.getElementById('editModeToggle');
+  const stored = localStorage.getItem(EDIT_MODE_STORAGE_KEY) === 'on';
+  document.body.classList.toggle('edit-mode', stored);
+  button.textContent = stored ? EDIT_MODE_ICONS.on : EDIT_MODE_ICONS.off;
+  button.setAttribute('aria-pressed', String(stored));
+
+  button.addEventListener('click', () => {
+    const next = !isEditModeOn();
+    document.body.classList.toggle('edit-mode', next);
+    localStorage.setItem(EDIT_MODE_STORAGE_KEY, next ? 'on' : 'off');
+    button.textContent = next ? EDIT_MODE_ICONS.on : EDIT_MODE_ICONS.off;
+    button.setAttribute('aria-pressed', String(next));
+    onToggle();
   });
 }
 
@@ -141,7 +178,7 @@ async function main() {
     grandTotalEl.textContent = `전체 예상 총액: ${formatKrw(plannedTotal + customTotal)}`;
   };
 
-  const costItemHandlers = {
+  const handlers = {
     onEditCostItem: async (key, values) => {
       try {
         await setBudgetOverride(key, values);
@@ -158,17 +195,59 @@ async function main() {
         showFirebaseNotice();
       }
     },
+    onEditBlock: async (blockKey, values) => {
+      try {
+        await setScheduleOverride(blockKey, values);
+      } catch (error) {
+        console.error('일정 내용 수정 실패', error);
+        showFirebaseNotice();
+      }
+    },
+    onDeleteBlock: async (blockKey, currentValues) => {
+      try {
+        await setScheduleOverride(blockKey, { ...currentValues, deleted: true });
+      } catch (error) {
+        console.error('일정 삭제 실패', error);
+        showFirebaseNotice();
+      }
+    },
+    onRestoreBlock: async (blockKey) => {
+      try {
+        await clearScheduleOverride(blockKey);
+      } catch (error) {
+        console.error('일정 되돌리기 실패', error);
+        showFirebaseNotice();
+      }
+    },
+    onAddBlock: async (dayId, values) => {
+      try {
+        await addScheduleCustomBlock(dayId, values);
+      } catch (error) {
+        console.error('일정 추가 실패', error);
+        showFirebaseNotice();
+      }
+    },
+    onDeleteCustomBlock: async (customId) => {
+      try {
+        await deleteScheduleCustomBlock(customId);
+      } catch (error) {
+        console.error('추가한 일정 삭제 실패', error);
+        showFirebaseNotice();
+      }
+    },
   };
 
   const dayNavEl = document.getElementById('dayNav');
   const tabBarEl = document.querySelector('.tab-bar');
 
-  let latestOverridesMap = new Map();
-  const renderScheduleAndSummary = (overridesMap) => {
-    latestOverridesMap = overridesMap;
-    const effectiveData = applyBudgetOverrides(itineraryData, overridesMap);
+  let latestBudgetOverridesMap = new Map();
+  let latestScheduleOverridesMap = new Map();
+  let latestCustomBlocksByDay = new Map();
+  const renderScheduleAndSummary = () => {
+    const budgetApplied = applyBudgetOverrides(itineraryData, latestBudgetOverridesMap);
+    const effectiveData = applyScheduleOverrides(budgetApplied, latestScheduleOverridesMap, latestCustomBlocksByDay);
     renderDayNav(dayNavEl, effectiveData);
-    renderDayList(dayListEl, effectiveData, rates, todayDayId, costItemHandlers);
+    renderDayList(dayListEl, effectiveData, rates, todayDayId, handlers, isEditModeOn());
     plannedTotal = renderBudgetSummary(
       document.getElementById('categoryBreakdown'),
       document.getElementById('plannedTotal'),
@@ -199,18 +278,31 @@ async function main() {
     rates = await getExchangeRates();
     renderRateStatus(rateStatusEl, rates);
     renderRateStatusCompact(headerRateStatusEl, rates);
-    renderScheduleAndSummary(latestOverridesMap);
+    renderScheduleAndSummary();
     renderCustomBudgetList(latestBudgetItems);
   }
   setInterval(refreshRates, EXCHANGE_RATE_REFRESH_INTERVAL_MS);
 
+  setupEditModeToggle(renderScheduleAndSummary);
+
   // Firestore 연결 여부와 상관없이 일정/예산 요약은 항상 먼저 보여준다.
-  renderScheduleAndSummary(new Map());
+  renderScheduleAndSummary();
 
   if (!isFirebaseConfigured) {
     showFirebaseNotice();
   } else {
-    subscribeToBudgetOverrides(renderScheduleAndSummary, () => showFirebaseNotice());
+    subscribeToBudgetOverrides((map) => {
+      latestBudgetOverridesMap = map;
+      renderScheduleAndSummary();
+    }, () => showFirebaseNotice());
+    subscribeToScheduleOverrides((map) => {
+      latestScheduleOverridesMap = map;
+      renderScheduleAndSummary();
+    }, () => showFirebaseNotice());
+    subscribeToScheduleCustomBlocks((byDay) => {
+      latestCustomBlocksByDay = byDay;
+      renderScheduleAndSummary();
+    }, () => showFirebaseNotice());
     subscribeToBudgetItems(renderCustomBudgetList, () => showFirebaseNotice());
   }
 }

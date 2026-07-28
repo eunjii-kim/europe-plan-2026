@@ -125,13 +125,98 @@ function renderCostItemEditForm(item, onEdit) {
 }
 
 /**
+ * 일정 블록의 시간/제목/메모를 수정하는 인라인 폼을 만든다.
+ * @param {{ time: string, title: string, note: string }} block
+ * @param {(values: { time: string, title: string, note: string }) => void} onSave
+ * @returns {HTMLFormElement}
+ */
+function renderTimeBlockEditForm(block, onSave) {
+  const form = document.createElement('form');
+  form.className = 'time-block-edit-form';
+  form.innerHTML = `
+    <input type="text" name="time" value="${escapeHtml(block.time)}" placeholder="시간 (예: 09:00)" aria-label="시간" required />
+    <input type="text" name="title" value="${escapeHtml(block.title)}" placeholder="제목" aria-label="제목" required />
+    <textarea name="note" placeholder="메모" aria-label="메모">${escapeHtml(block.note || '')}</textarea>
+    <button type="submit">저장</button>
+  `;
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const data = new FormData(form);
+    onSave({
+      time: data.get('time').trim(),
+      title: data.get('title').trim(),
+      note: data.get('note').trim(),
+    });
+  });
+  return form;
+}
+
+/**
+ * 편집모드에서 일정 블록에 붙는 수정/삭제/되돌리기 버튼과 수정 폼을 만든다.
+ * @param {object} block
+ * @param {object} handlers
+ * @returns {{ controls: HTMLElement, form: HTMLFormElement | null }}
+ */
+function renderTimeBlockEditControls(block, handlers) {
+  const controls = document.createElement('div');
+  controls.className = 'time-block-edit-controls';
+
+  let form = null;
+  if (!block.isCustom) {
+    const editButton = document.createElement('button');
+    editButton.type = 'button';
+    editButton.className = 'time-block-icon-button';
+    editButton.textContent = '✏️';
+    editButton.setAttribute('aria-label', '일정 수정');
+
+    form = renderTimeBlockEditForm(block, (values) => {
+      handlers.onEditBlock(block.blockKey, values);
+      form.hidden = true;
+    });
+    form.hidden = true;
+    editButton.addEventListener('click', () => {
+      form.hidden = !form.hidden;
+    });
+    controls.appendChild(editButton);
+
+    if (block.overridden) {
+      const restoreButton = document.createElement('button');
+      restoreButton.type = 'button';
+      restoreButton.className = 'time-block-icon-button';
+      restoreButton.textContent = '↺';
+      restoreButton.setAttribute('aria-label', '일정 원래대로');
+      restoreButton.addEventListener('click', () => handlers.onRestoreBlock(block.blockKey));
+      controls.appendChild(restoreButton);
+    }
+  }
+
+  const deleteButton = document.createElement('button');
+  deleteButton.type = 'button';
+  deleteButton.className = 'time-block-icon-button time-block-delete-button';
+  deleteButton.textContent = '🗑️';
+  deleteButton.setAttribute('aria-label', '일정 삭제');
+  deleteButton.addEventListener('click', () => {
+    if (!window.confirm('이 일정을 삭제할까요?')) return;
+    if (block.isCustom) {
+      handlers.onDeleteCustomBlock(block.customId);
+    } else {
+      handlers.onDeleteBlock(block.blockKey, { time: block.time, title: block.title, note: block.note || '' });
+    }
+  });
+  controls.appendChild(deleteButton);
+
+  return { controls, form };
+}
+
+/**
  * timeBlock 하나의 DOM 요소를 만든다.
  * @param {object} block
  * @param {{ CHF: number, EUR: number }} rates
- * @param {{ onEditCostItem: Function, onResetCostItem: Function }} handlers
+ * @param {object} handlers
+ * @param {boolean} editMode
  * @returns {HTMLElement}
  */
-function renderTimeBlock(block, rates, handlers) {
+function renderTimeBlock(block, rates, handlers, editMode) {
   const wrapper = document.createElement('div');
   wrapper.className = 'time-block';
 
@@ -141,8 +226,8 @@ function renderTimeBlock(block, rates, handlers) {
   const main = document.createElement('div');
   main.className = 'time-block-main';
   main.innerHTML = `
-    <span class="time-block-time">${block.time}</span>
-    <span class="time-block-title">${icon ? `${icon} ` : ''}${escapeHtml(block.title)}</span>
+    <span class="time-block-time">${escapeHtml(block.time)}</span>
+    <span class="time-block-title${block.overridden ? ' is-overridden' : ''}">${icon ? `${icon} ` : ''}${escapeHtml(block.title)}</span>
     ${mainCostItem ? `<span class="time-block-cost${mainCostItem.overridden ? ' is-overridden' : ''}">${formatCostBadge(mainCostItem, rates)}</span>` : ''}
   `;
   wrapper.appendChild(main);
@@ -152,6 +237,13 @@ function renderTimeBlock(block, rates, handlers) {
     tag.className = 'location-tag';
     tag.textContent = `📍 ${block.locationTag}`;
     wrapper.insertBefore(tag, main);
+  }
+
+  let editForm = null;
+  if (editMode) {
+    const { controls, form } = renderTimeBlockEditControls(block, handlers);
+    editForm = form;
+    main.appendChild(controls);
   }
 
   const hasMore = Boolean(block.note) || (block.costItems && block.costItems.length > 0);
@@ -214,6 +306,10 @@ function renderTimeBlock(block, rates, handlers) {
     wrapper.appendChild(more);
   }
 
+  if (editForm) {
+    wrapper.appendChild(editForm);
+  }
+
   return wrapper;
 }
 
@@ -229,14 +325,59 @@ function escapeHtml(text) {
 }
 
 /**
+ * 편집모드에서 날짜 카드 하단에 붙는 "일정 추가" 버튼과 폼을 만든다.
+ * @param {string} dayId
+ * @param {(dayId: string, values: { time: string, title: string, note: string }) => void} onAdd
+ * @returns {HTMLElement}
+ */
+function renderAddBlockSection(dayId, onAdd) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'add-block-section';
+
+  const form = document.createElement('form');
+  form.className = 'add-block-form';
+  form.hidden = true;
+  form.innerHTML = `
+    <input type="text" name="time" placeholder="시간 (예: 09:00)" aria-label="시간" required />
+    <input type="text" name="title" placeholder="제목" aria-label="제목" required />
+    <textarea name="note" placeholder="메모 (선택)" aria-label="메모"></textarea>
+    <button type="submit">추가</button>
+  `;
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const data = new FormData(form);
+    onAdd(dayId, {
+      time: data.get('time').trim(),
+      title: data.get('title').trim(),
+      note: data.get('note').trim(),
+    });
+    form.reset();
+    form.hidden = true;
+  });
+
+  const toggleButton = document.createElement('button');
+  toggleButton.type = 'button';
+  toggleButton.className = 'add-block-button';
+  toggleButton.textContent = '+ 일정 추가';
+  toggleButton.addEventListener('click', () => {
+    form.hidden = !form.hidden;
+  });
+
+  wrapper.appendChild(toggleButton);
+  wrapper.appendChild(form);
+  return wrapper;
+}
+
+/**
  * 일자별 일정 카드 목록을 렌더링한다.
  * @param {HTMLElement} listEl
  * @param {Array} itineraryData
  * @param {{ CHF: number, EUR: number }} rates
  * @param {string | null} todayDayId - 오늘 날짜와 일치하는 day.id (없으면 null)
- * @param {{ onEditCostItem: Function, onResetCostItem: Function }} handlers
+ * @param {object} handlers - 비용/일정 편집 관련 핸들러 모음
+ * @param {boolean} editMode
  */
-export function renderDayList(listEl, itineraryData, rates, todayDayId, handlers) {
+export function renderDayList(listEl, itineraryData, rates, todayDayId, handlers, editMode) {
   listEl.innerHTML = '';
   itineraryData.forEach((day, index) => {
     const { accentVar, bgVar, flag } = getCountryAccent(day.region);
@@ -256,9 +397,13 @@ export function renderDayList(listEl, itineraryData, rates, todayDayId, handlers
     const blockList = document.createElement('div');
     blockList.className = 'time-block-list';
     for (const block of day.timeBlocks) {
-      blockList.appendChild(renderTimeBlock(block, rates, handlers));
+      blockList.appendChild(renderTimeBlock(block, rates, handlers, editMode));
     }
     card.appendChild(blockList);
+
+    if (editMode) {
+      card.appendChild(renderAddBlockSection(day.id, handlers.onAddBlock));
+    }
 
     listEl.appendChild(card);
   });

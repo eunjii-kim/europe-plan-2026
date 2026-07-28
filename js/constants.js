@@ -59,3 +59,6 @@ export const SWISS_REGIONS = new Set(['인터라켄', '그린델발트', '융프
 
 /** localStorage에 라이트/다크 테마 선택값을 저장할 때 쓰는 키 */
 export const THEME_STORAGE_KEY = 'europePlan2026:theme';
+
+/** localStorage에 편집모드 on/off 상태를 저장할 때 쓰는 키 */
+export const EDIT_MODE_STORAGE_KEY = 'europePlan2026:editMode';
