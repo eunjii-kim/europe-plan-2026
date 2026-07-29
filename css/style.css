@@ -1,7 +1,8 @@
 /*
  * 색상 토큰은 shadcn/ui의 기본 Neutral 테마(oklch)를 그대로 가져왔다.
  * https://ui.shadcn.com/create 의 Style: Nova / Base Color: Neutral 기준.
- * primary는 neutral 회색 대신 파란색 브랜드 색을 얹어 인터랙션 요소를 구분했다.
+ * primary도 브랜드 컬러를 얹지 않고 Neutral 테마 그대로(라이트: 짙은 회색/화이트 텍스트,
+ * 다크: 밝은 회색/블랙 텍스트) 사용해 버튼·탭 등 전체 톤을 무채색으로 통일했다.
  */
 :root {
   --background: oklch(1 0 0);
@@ -11,10 +12,10 @@
   --muted: oklch(0.97 0 0);
   --muted-foreground: oklch(0.556 0 0);
   --border: oklch(0.922 0 0);
-  --primary: #2563eb;
-  --primary-foreground: #ffffff;
-  --primary-muted: oklch(0.933 0.032 255 / 20%);
-  --danger: #dc2626;
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --primary-muted: oklch(0 0 0 / 6%);
+  --danger: oklch(0.577 0.245 27.325);
 
   --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
     'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
@@ -47,9 +48,10 @@
     --muted: oklch(0.269 0 0);
     --muted-foreground: oklch(0.708 0 0);
     --border: oklch(1 0 0 / 10%);
-    --primary: #60a5fa;
+    --primary: oklch(0.922 0 0);
     --primary-foreground: oklch(0.205 0 0);
-    --primary-muted: oklch(0.6 0.12 255 / 18%);
+    --primary-muted: oklch(1 0 0 / 10%);
+    --danger: oklch(0.704 0.191 22.216);
 
     --swiss-accent: #f87171;
     --swiss-accent-bg: oklch(0.32 0.05 25);
@@ -66,9 +68,10 @@
   --muted: oklch(0.269 0 0);
   --muted-foreground: oklch(0.708 0 0);
   --border: oklch(1 0 0 / 10%);
-  --primary: #60a5fa;
+  --primary: oklch(0.922 0 0);
   --primary-foreground: oklch(0.205 0 0);
-  --primary-muted: oklch(0.6 0.12 255 / 18%);
+  --primary-muted: oklch(1 0 0 / 10%);
+  --danger: oklch(0.704 0.191 22.216);
 
   --swiss-accent: #f87171;
   --swiss-accent-bg: oklch(0.32 0.05 25);
