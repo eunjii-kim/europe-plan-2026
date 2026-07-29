@@ -10,6 +10,11 @@ import {
   renderRateStatusCompact,
   renderBudgetSummary,
   renderBudgetList,
+  renderPlaceFilters,
+  renderPlaceList,
+  renderExpenseList,
+  renderExpenseStats,
+  PLACE_FILTER_ALL,
 } from './render.js';
 import { formatKrw, applyBudgetOverrides } from './budgetCalc.js';
 import { applyScheduleOverrides } from './scheduleCalc.js';
@@ -31,6 +36,8 @@ import {
   deleteScheduleCustomBlock,
   updateScheduleCustomBlockAttachments,
 } from './schedule.js';
+import { subscribeToPlaces, addPlace, deletePlace } from './places.js';
+import { subscribeToExpenses, addExpense, deleteExpense } from './expenses.js';
 import { isFirebaseConfigured } from './firebaseConfig.js';
 
 /**
@@ -49,6 +56,8 @@ function setupTabs() {
   const panels = {
     schedule: document.getElementById('scheduleTab'),
     budget: document.getElementById('budgetTab'),
+    info: document.getElementById('infoTab'),
+    expense: document.getElementById('expenseTab'),
   };
   buttons.forEach((button) => {
     button.addEventListener('click', () => {
@@ -116,6 +125,25 @@ function setupEditModeToggle(onToggle) {
   });
 }
 
+/**
+ * select 요소에 지역 옵션 목록을 채운다. 첫 옵션은 "지역 선택 안함"이다.
+ * @param {HTMLSelectElement} selectEl
+ * @param {string[]} regions
+ */
+function populateRegionSelect(selectEl, regions) {
+  const emptyOption = document.createElement('option');
+  emptyOption.value = '';
+  emptyOption.textContent = '지역 선택 안함';
+  selectEl.appendChild(emptyOption);
+
+  for (const region of regions) {
+    const option = document.createElement('option');
+    option.value = region;
+    option.textContent = region;
+    selectEl.appendChild(option);
+  }
+}
+
 /** 일정 탭의 모두 펼치기/모두 접기 버튼을 연결한다. */
 function setupExpandCollapseButtons() {
   const dayList = document.getElementById('dayList');
@@ -151,13 +179,73 @@ function setupBudgetForm() {
   });
 }
 
-/** Firebase 미설정/연결 실패 안내 배너를 표시한다. */
+/** Firebase 미설정/연결 실패 안내 배너를 (탭 상관없이) 모두 표시한다. */
 function showFirebaseNotice() {
-  const notice = document.getElementById('firebaseNotice');
-  notice.hidden = false;
-  notice.textContent = isFirebaseConfigured
-    ? '예산 서버 연결에 실패했습니다. 네트워크 상태를 확인해주세요.'
-    : 'Firebase가 아직 설정되지 않았습니다. README.md의 안내에 따라 firebaseConfig.js를 설정하면 여러 기기 간 예산 공유가 활성화됩니다.';
+  const message = isFirebaseConfigured
+    ? '서버 연결에 실패했습니다. 네트워크 상태를 확인해주세요.'
+    : 'Firebase가 아직 설정되지 않았습니다. README.md의 안내에 따라 firebaseConfig.js를 설정하면 여러 기기 간 데이터 공유가 활성화됩니다.';
+  document.querySelectorAll('.firebase-notice').forEach((notice) => {
+    notice.hidden = false;
+    notice.textContent = message;
+  });
+}
+
+/** "정보" 탭의 장소 추가 폼 제출을 처리한다. */
+function setupPlaceForm() {
+  const form = document.getElementById('placeForm');
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const category = document.getElementById('placeCategoryInput').value;
+    const region = document.getElementById('placeRegionInput').value;
+    const titleInput = document.getElementById('placeTitleInput');
+    const linkInput = document.getElementById('placeLinkInput');
+    const memoInput = document.getElementById('placeMemoInput');
+
+    const title = titleInput.value.trim();
+    if (!title) return;
+
+    try {
+      await addPlace({ category, region, title, link: linkInput.value.trim(), memo: memoInput.value.trim() });
+      form.reset();
+    } catch (error) {
+      console.error('장소 추가 실패', error);
+      showFirebaseNotice();
+    }
+  });
+}
+
+/** "소비기록" 탭의 지출 입력 폼 제출을 처리한다. */
+function setupExpenseForm() {
+  const form = document.getElementById('expenseForm');
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const dateInput = document.getElementById('expenseDateInput');
+    const category = document.getElementById('expenseCategoryInput').value;
+    const region = document.getElementById('expenseRegionInput').value;
+    const titleInput = document.getElementById('expenseTitleInput');
+    const amountInput = document.getElementById('expenseAmountInput');
+    const currencyInput = document.getElementById('expenseCurrencyInput');
+
+    const date = dateInput.value;
+    const amount = Number(amountInput.value);
+    if (!date || !Number.isFinite(amount) || amount < 0) return;
+
+    try {
+      await addExpense({
+        date,
+        category,
+        region,
+        title: titleInput.value.trim(),
+        amount,
+        currency: currencyInput.value,
+      });
+      form.reset();
+      dateInput.value = date;
+    } catch (error) {
+      console.error('지출 기록 추가 실패', error);
+      showFirebaseNotice();
+    }
+  });
 }
 
 /**
@@ -188,6 +276,16 @@ async function main() {
   setupThemeToggle();
   setupExpandCollapseButtons();
   setupBudgetForm();
+  setupPlaceForm();
+  setupExpenseForm();
+
+  const tripRegions = [...new Set(itineraryData.map((day) => day.region))];
+  populateRegionSelect(document.getElementById('placeRegionInput'), tripRegions);
+  populateRegionSelect(document.getElementById('expenseRegionInput'), tripRegions);
+
+  const expenseDateInput = document.getElementById('expenseDateInput');
+  expenseDateInput.min = TRIP_INFO.startDate;
+  expenseDateInput.max = TRIP_INFO.endDate;
 
   const rateStatusEl = document.getElementById('rateStatus');
   const headerRateStatusEl = document.getElementById('headerRateStatus');
@@ -287,6 +385,40 @@ async function main() {
   const dayNavEl = document.getElementById('dayNav');
   const tabBarEl = document.querySelector('.tab-bar');
 
+  let latestPlaces = [];
+  let placeFilterCategory = PLACE_FILTER_ALL;
+  const renderPlacesTab = () => {
+    const filtered =
+      placeFilterCategory === PLACE_FILTER_ALL
+        ? latestPlaces
+        : latestPlaces.filter((item) => item.category === placeFilterCategory);
+    renderPlaceFilters(document.getElementById('placeFilters'), placeFilterCategory, (category) => {
+      placeFilterCategory = category;
+      renderPlacesTab();
+    });
+    renderPlaceList(document.getElementById('placeList'), filtered, async (id) => {
+      try {
+        await deletePlace(id);
+      } catch (error) {
+        console.error('장소 삭제 실패', error);
+        showFirebaseNotice();
+      }
+    });
+  };
+
+  let latestExpenses = [];
+  const renderExpenseTab = () => {
+    renderExpenseList(document.getElementById('expenseList'), latestExpenses, rates, async (id) => {
+      try {
+        await deleteExpense(id);
+      } catch (error) {
+        console.error('지출 기록 삭제 실패', error);
+        showFirebaseNotice();
+      }
+    });
+    renderExpenseStats(document.getElementById('expenseStats'), latestExpenses, rates, plannedTotal);
+  };
+
   let latestBudgetOverridesMap = new Map();
   let latestScheduleOverridesMap = new Map();
   let latestCustomBlocksByDay = new Map();
@@ -302,6 +434,7 @@ async function main() {
       rates,
     );
     updateGrandTotal();
+    renderExpenseTab();
     setupScrollSpy(dayListEl, dayNavEl, tabBarEl);
   };
 
@@ -334,6 +467,7 @@ async function main() {
 
   // Firestore 연결 여부와 상관없이 일정/예산 요약은 항상 먼저 보여준다.
   renderScheduleAndSummary();
+  renderPlacesTab();
 
   if (!isFirebaseConfigured) {
     showFirebaseNotice();
@@ -351,6 +485,14 @@ async function main() {
       renderScheduleAndSummary();
     }, () => showFirebaseNotice());
     subscribeToBudgetItems(renderCustomBudgetList, () => showFirebaseNotice());
+    subscribeToPlaces((items) => {
+      latestPlaces = items;
+      renderPlacesTab();
+    }, () => showFirebaseNotice());
+    subscribeToExpenses((items) => {
+      latestExpenses = items;
+      renderExpenseTab();
+    }, () => showFirebaseNotice());
   }
 }
 

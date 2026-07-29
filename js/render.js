@@ -1,5 +1,16 @@
-import { CATEGORY_ICONS, DEFAULT_CATEGORY_ICON, SWISS_REGIONS, ICONS } from './constants.js';
-import { perPersonKrw, calcPlannedTotalKrw, groupCostByCategory, calcCustomBudgetTotalKrw, formatKrw } from './budgetCalc.js';
+import {
+  CATEGORY_ICONS,
+  DEFAULT_CATEGORY_ICON,
+  SWISS_REGIONS,
+  ICONS,
+  PLACE_CATEGORIES,
+  PLACE_CATEGORY_ICONS,
+  DEFAULT_PLACE_CATEGORY_ICON,
+  EXPENSE_CATEGORY_ICONS,
+  DEFAULT_EXPENSE_CATEGORY_ICON,
+} from './constants.js';
+import { perPersonKrw, calcPlannedTotalKrw, groupCostByCategory, calcCustomBudgetTotalKrw, convertToKrw, formatKrw } from './budgetCalc.js';
+import { calcExpenseTotalKrw, groupExpenseByCategory, groupExpenseByRegion, groupExpenseByCountry } from './expenseCalc.js';
 
 /**
  * 'YYYY-MM-DD' 문자열을 시간대 이슈 없이 로컬 Date로 변환한다.
@@ -599,4 +610,213 @@ export function renderBudgetList(listEl, items, rates, onDelete) {
     listEl.appendChild(li);
   }
   return calcCustomBudgetTotalKrw(items, rates);
+}
+
+/** "정보" 탭 분류 필터에서 전체보기를 나타내는 값 */
+export const PLACE_FILTER_ALL = '전체';
+
+/**
+ * "정보" 탭의 분류 필터 버튼(전체 + 분류별)을 렌더링한다.
+ * @param {HTMLElement} containerEl
+ * @param {string} activeCategory - PLACE_FILTER_ALL 또는 PLACE_CATEGORIES 중 하나
+ * @param {(category: string) => void} onSelect
+ */
+export function renderPlaceFilters(containerEl, activeCategory, onSelect) {
+  containerEl.innerHTML = '';
+  const categories = [PLACE_FILTER_ALL, ...PLACE_CATEGORIES];
+  for (const category of categories) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'place-filter-button';
+    button.classList.toggle('is-active', category === activeCategory);
+    const icon = category === PLACE_FILTER_ALL ? '' : `${PLACE_CATEGORY_ICONS[category]} `;
+    button.textContent = `${icon}${category}`;
+    button.addEventListener('click', () => onSelect(category));
+    containerEl.appendChild(button);
+  }
+}
+
+/**
+ * 조사한 장소(맛집/카페/쇼핑 등) 목록을 렌더링한다.
+ * @param {HTMLElement} listEl
+ * @param {Array<{ id: string, category: string, title: string, region: string, link: string, memo: string }>} items
+ * @param {(id: string) => void} onDelete
+ */
+export function renderPlaceList(listEl, items, onDelete) {
+  listEl.innerHTML = '';
+  if (items.length === 0) {
+    const empty = document.createElement('li');
+    empty.className = 'place-list-empty';
+    empty.textContent = '아직 추가한 장소가 없습니다.';
+    listEl.appendChild(empty);
+    return;
+  }
+  for (const item of items) {
+    const li = document.createElement('li');
+    li.className = 'place-list-item';
+    const icon = PLACE_CATEGORY_ICONS[item.category] || DEFAULT_PLACE_CATEGORY_ICON;
+    const regionTag = item.region ? `<span class="place-item-region">📍 ${escapeHtml(item.region)}</span>` : '';
+
+    const main = document.createElement('div');
+    main.className = 'place-item-main';
+    main.innerHTML = `
+      <span class="place-item-category">${icon} ${escapeHtml(item.category)}</span>
+      <span class="place-item-title">${escapeHtml(item.title)}</span>
+      ${regionTag}
+    `;
+    li.appendChild(main);
+
+    if (item.memo) {
+      const memo = document.createElement('p');
+      memo.className = 'place-item-memo';
+      memo.textContent = item.memo;
+      li.appendChild(memo);
+    }
+
+    if (item.link) {
+      const link = document.createElement('a');
+      link.className = 'place-item-link';
+      link.href = item.link;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.textContent = `🔗 ${safeHostname(item.link)}`;
+      li.appendChild(link);
+    }
+
+    const deleteButton = document.createElement('button');
+    deleteButton.type = 'button';
+    deleteButton.className = 'place-item-delete';
+    deleteButton.innerHTML = ICONS.x;
+    deleteButton.setAttribute('aria-label', '삭제');
+    deleteButton.addEventListener('click', () => onDelete(item.id));
+    li.appendChild(deleteButton);
+
+    listEl.appendChild(li);
+  }
+}
+
+/** 국가명별 국기 이모지. resolveCountry()가 반환하는 '미지정'은 매핑에 없으므로 기본 이모지를 쓴다. */
+const COUNTRY_FLAGS = { 스위스: '🇨🇭', 이탈리아: '🇮🇹' };
+const DEFAULT_COUNTRY_FLAG = '🌍';
+
+/**
+ * 지출 기록 목록을 렌더링한다.
+ * @param {HTMLElement} listEl
+ * @param {Array<{ id: string, date: string, category: string, title: string, region: string, amount: number, currency: string }>} items
+ * @param {{ CHF: number, EUR: number }} rates
+ * @param {(id: string) => void} onDelete
+ */
+export function renderExpenseList(listEl, items, rates, onDelete) {
+  listEl.innerHTML = '';
+  if (items.length === 0) {
+    const empty = document.createElement('li');
+    empty.className = 'expense-list-empty';
+    empty.textContent = '아직 기록한 지출이 없습니다.';
+    listEl.appendChild(empty);
+    return;
+  }
+  for (const item of items) {
+    const li = document.createElement('li');
+    li.className = 'expense-list-item';
+    const icon = EXPENSE_CATEGORY_ICONS[item.category] || DEFAULT_EXPENSE_CATEGORY_ICON;
+    const krwLabel = item.currency === 'KRW' ? '' : ` (${formatKrw(convertToKrw(item.amount, item.currency, rates))})`;
+    const regionTag = item.region ? `<span class="expense-item-region">📍 ${escapeHtml(item.region)}</span>` : '';
+    li.innerHTML = `
+      <span class="expense-item-date">${escapeHtml(item.date)}</span>
+      <span class="expense-item-category">${icon} ${escapeHtml(item.category)}</span>
+      <span class="expense-item-title">${escapeHtml(item.title || '')}</span>
+      ${regionTag}
+      <span class="expense-item-amount">${item.amount.toLocaleString('ko-KR')} ${item.currency}${krwLabel}</span>
+      <button type="button" class="expense-item-delete" aria-label="삭제">${ICONS.x}</button>
+    `;
+    li.querySelector('.expense-item-delete').addEventListener('click', () => onDelete(item.id));
+    listEl.appendChild(li);
+  }
+}
+
+/**
+ * 소계 배열을 "카테고리 행 + 막대 그래프" 형태로 렌더링하는 공통 섹션을 만든다.
+ * @param {string} title - 섹션 제목
+ * @param {Array<{ totalKrw: number }>} groups - 라벨 필드(labelKey)와 totalKrw를 가진 배열
+ * @param {string} labelKey - groups 각 항목에서 라벨로 쓸 필드명
+ * @param {(label: string) => string} resolveIcon - 라벨에 대응하는 아이콘/이모지를 반환
+ * @returns {HTMLElement | null} groups가 비어있으면 null
+ */
+function renderExpenseBreakdownSection(title, groups, labelKey, resolveIcon) {
+  if (groups.length === 0) return null;
+
+  const section = document.createElement('div');
+  section.className = 'expense-breakdown-section';
+
+  const heading = document.createElement('h3');
+  heading.className = 'expense-breakdown-title';
+  heading.textContent = title;
+  section.appendChild(heading);
+
+  const breakdown = document.createElement('div');
+  breakdown.className = 'category-breakdown';
+  const maxKrw = groups[0].totalKrw;
+  for (const group of groups) {
+    const label = group[labelKey];
+    const icon = resolveIcon(label);
+    const row = document.createElement('div');
+    row.className = 'expense-category-row';
+    const ratio = maxKrw > 0 ? Math.round((group.totalKrw / maxKrw) * 100) : 0;
+    row.innerHTML = `
+      <div class="category-row"><span>${icon} ${escapeHtml(label)}</span><span>${formatKrw(group.totalKrw)}</span></div>
+      <div class="expense-bar-track"><div class="expense-bar-fill" style="width: ${ratio}%"></div></div>
+    `;
+    breakdown.appendChild(row);
+  }
+  section.appendChild(breakdown);
+  return section;
+}
+
+/**
+ * 지출 통계(총합, 카테고리·지역·국가별 소계, 예산 대비 잔액)를 렌더링한다.
+ * @param {HTMLElement} el
+ * @param {Array<{ category: string, region: string, amount: number, currency: string }>} expenses
+ * @param {{ CHF: number, EUR: number }} rates
+ * @param {number} plannedTotalKrw - 예산 탭에서 계산된 1인 예정 비용 총합(KRW)
+ */
+export function renderExpenseStats(el, expenses, rates, plannedTotalKrw) {
+  const totalKrw = calcExpenseTotalKrw(expenses, rates);
+  const remainingKrw = plannedTotalKrw - totalKrw;
+
+  el.innerHTML = '';
+
+  const totalLine = document.createElement('p');
+  totalLine.className = 'total-line';
+  totalLine.textContent = `총 지출: ${formatKrw(totalKrw)}`;
+  el.appendChild(totalLine);
+
+  const categorySection = renderExpenseBreakdownSection(
+    '카테고리별',
+    groupExpenseByCategory(expenses, rates),
+    'category',
+    (category) => EXPENSE_CATEGORY_ICONS[category] || DEFAULT_EXPENSE_CATEGORY_ICON,
+  );
+  if (categorySection) el.appendChild(categorySection);
+
+  const countrySection = renderExpenseBreakdownSection(
+    '국가별',
+    groupExpenseByCountry(expenses, rates),
+    'country',
+    (country) => COUNTRY_FLAGS[country] || DEFAULT_COUNTRY_FLAG,
+  );
+  if (countrySection) el.appendChild(countrySection);
+
+  const regionSection = renderExpenseBreakdownSection(
+    '지역별',
+    groupExpenseByRegion(expenses, rates),
+    'region',
+    () => '📍',
+  );
+  if (regionSection) el.appendChild(regionSection);
+
+  const remainingLine = document.createElement('p');
+  remainingLine.className = `total-line expense-remaining-line${remainingKrw < 0 ? ' is-over' : ''}`;
+  remainingLine.textContent =
+    remainingKrw >= 0 ? `예정 비용 대비 남은 예산: ${formatKrw(remainingKrw)}` : `예정 비용 초과: ${formatKrw(-remainingKrw)}`;
+  el.appendChild(remainingLine);
 }

@@ -54,6 +54,34 @@ export const CATEGORY_ICONS = {
 
 export const DEFAULT_CATEGORY_ICON = '💰';
 
+/** "정보" 탭에서 쓰는 장소 분류 목록 */
+export const PLACE_CATEGORIES = ['맛집', '카페', '쇼핑', '기타'];
+
+/** 장소 분류별 아이콘 */
+export const PLACE_CATEGORY_ICONS = {
+  맛집: '🍴',
+  카페: '☕',
+  쇼핑: '🛍️',
+  기타: '📌',
+};
+
+export const DEFAULT_PLACE_CATEGORY_ICON = '📌';
+
+/** "소비기록" 탭에서 쓰는 지출 분류 목록 */
+export const EXPENSE_CATEGORIES = ['식비', '교통', '숙소', '쇼핑', '입장료/투어', '기타'];
+
+/** 지출 분류별 아이콘 */
+export const EXPENSE_CATEGORY_ICONS = {
+  식비: '🍽️',
+  교통: '🚄',
+  숙소: '🏨',
+  쇼핑: '🛍️',
+  '입장료/투어': '🎟️',
+  기타: '💰',
+};
+
+export const DEFAULT_EXPENSE_CATEGORY_ICON = '💰';
+
 /** 스위스 구간에 해당하는 지역명. 이 목록에 없는 지역은 이탈리아 구간으로 간주한다. */
 export const SWISS_REGIONS = new Set(['인터라켄', '그린델발트', '융프라우', '체르마트']);
 

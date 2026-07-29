@@ -24,6 +24,8 @@
   <nav class="tab-bar" role="tablist">
     <button type="button" class="tab-button" data-tab="schedule" aria-selected="true">일정</button>
     <button type="button" class="tab-button" data-tab="budget" aria-selected="false">예산</button>
+    <button type="button" class="tab-button" data-tab="info" aria-selected="false">정보</button>
+    <button type="button" class="tab-button" data-tab="expense" aria-selected="false">소비기록</button>
   </nav>
 
   <main>
@@ -66,6 +68,59 @@
       </div>
 
       <p id="grandTotal" class="grand-total"></p>
+    </section>
+
+    <section id="infoTab" class="tab-panel" hidden>
+      <p class="hint">조사한 맛집·카페·쇼핑 정보를 추가하면 다른 기기와 실시간으로 공유됩니다.</p>
+      <p class="firebase-notice" hidden></p>
+
+      <div id="placeFilters" class="place-filters"></div>
+
+      <form id="placeForm" class="place-form">
+        <select id="placeCategoryInput" aria-label="분류">
+          <option value="맛집">맛집</option>
+          <option value="카페">카페</option>
+          <option value="쇼핑">쇼핑</option>
+          <option value="기타">기타</option>
+        </select>
+        <select id="placeRegionInput" aria-label="지역"></select>
+        <input id="placeTitleInput" type="text" placeholder="이름 (예: OO 레스토랑)" required maxlength="100" />
+        <input id="placeLinkInput" type="url" placeholder="링크 (선택)" />
+        <input id="placeMemoInput" type="text" placeholder="메모 (선택)" maxlength="200" />
+        <button type="submit">추가</button>
+      </form>
+
+      <ul id="placeList" class="place-list"></ul>
+    </section>
+
+    <section id="expenseTab" class="tab-panel" hidden>
+      <p class="hint">여행 중 실제로 쓴 금액을 기록하면 예정 비용과 비교한 통계를 볼 수 있습니다.</p>
+      <p class="firebase-notice" hidden></p>
+
+      <div id="expenseStats" class="expense-stats"></div>
+
+      <form id="expenseForm" class="expense-form">
+        <input id="expenseDateInput" type="date" required />
+        <select id="expenseCategoryInput" aria-label="분류">
+          <option value="식비">식비</option>
+          <option value="교통">교통</option>
+          <option value="숙소">숙소</option>
+          <option value="쇼핑">쇼핑</option>
+          <option value="입장료/투어">입장료/투어</option>
+          <option value="기타">기타</option>
+        </select>
+        <select id="expenseRegionInput" aria-label="지역"></select>
+        <input id="expenseTitleInput" type="text" placeholder="항목명 (선택)" maxlength="100" />
+        <input id="expenseAmountInput" type="number" placeholder="금액" required min="0" step="1" />
+        <select id="expenseCurrencyInput" aria-label="화폐">
+          <option value="KRW">KRW</option>
+          <option value="EUR">EUR</option>
+          <option value="CHF">CHF</option>
+        </select>
+        <button type="submit">기록</button>
+      </form>
+
+      <ul id="expenseList" class="expense-list"></ul>
     </section>
   </main>
 
