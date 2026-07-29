@@ -16,7 +16,7 @@ import {
   renderExpenseStats,
   PLACE_FILTER_ALL,
 } from './render.js';
-import { formatKrw, applyBudgetOverrides } from './budgetCalc.js';
+import { formatKrw, applyBudgetOverrides, applyCustomCostItems, groupCustomCostItemsByAnchorKey } from './budgetCalc.js';
 import { applyScheduleOverrides } from './scheduleCalc.js';
 import { setupScrollSpy } from './scrollSpy.js';
 import {
@@ -26,6 +26,7 @@ import {
   subscribeToBudgetOverrides,
   setBudgetOverride,
   clearBudgetOverride,
+  addCustomCostItem,
 } from './budget.js';
 import {
   subscribeToScheduleOverrides,
@@ -142,6 +143,15 @@ function populateRegionSelect(selectEl, regions) {
     option.textContent = region;
     selectEl.appendChild(option);
   }
+}
+
+/**
+ * 현재 열려있는 날짜 카드의 id 목록을 반환한다. 재렌더링 후에도 열림 상태를 복원하기 위해 쓴다.
+ * @param {HTMLElement} listEl
+ * @returns {Set<string>}
+ */
+function getOpenDayIds(listEl) {
+  return new Set([...listEl.querySelectorAll('.day-card[open]')].map((card) => card.id));
 }
 
 /** 일정 탭의 모두 펼치기/모두 접기 버튼을 연결한다. */
@@ -324,6 +334,14 @@ async function main() {
         showFirebaseNotice();
       }
     },
+    onAddCostItem: async (anchorKey, values) => {
+      try {
+        await addCustomCostItem(anchorKey, values);
+      } catch (error) {
+        console.error('비용 항목 추가 실패', error);
+        showFirebaseNotice();
+      }
+    },
     onEditBlock: async (blockKey, values) => {
       try {
         await setScheduleOverride(blockKey, values);
@@ -422,11 +440,15 @@ async function main() {
   let latestBudgetOverridesMap = new Map();
   let latestScheduleOverridesMap = new Map();
   let latestCustomBlocksByDay = new Map();
+  let hasRenderedScheduleOnce = false;
   const renderScheduleAndSummary = () => {
     const budgetApplied = applyBudgetOverrides(itineraryData, latestBudgetOverridesMap);
-    const effectiveData = applyScheduleOverrides(budgetApplied, latestScheduleOverridesMap, latestCustomBlocksByDay);
+    const scheduleApplied = applyScheduleOverrides(budgetApplied, latestScheduleOverridesMap, latestCustomBlocksByDay);
+    const effectiveData = applyCustomCostItems(scheduleApplied, groupCustomCostItemsByAnchorKey(latestBudgetOverridesMap));
+    const openDayIds = hasRenderedScheduleOnce ? getOpenDayIds(dayListEl) : null;
     renderDayNav(dayNavEl, effectiveData);
-    renderDayList(dayListEl, effectiveData, rates, todayDayId, handlers, isEditModeOn());
+    renderDayList(dayListEl, effectiveData, rates, todayDayId, handlers, isEditModeOn(), openDayIds);
+    hasRenderedScheduleOnce = true;
     plannedTotal = renderBudgetSummary(
       document.getElementById('categoryBreakdown'),
       document.getElementById('plannedTotal'),

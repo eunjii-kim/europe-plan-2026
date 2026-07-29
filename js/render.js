@@ -127,12 +127,65 @@ function renderCostItemEditForm(item, onEdit) {
     event.preventDefault();
     const data = new FormData(form);
     onEdit(item.key, {
+      category: item.category,
       amount: Number(data.get('amount')),
       currency: data.get('currency'),
       headcount: Number(data.get('headcount')) || 1,
     });
   });
   return form;
+}
+
+/**
+ * 비용이 없던 블록에 새 비용 항목을 추가하는 인라인 폼을 만든다.
+ * @param {(values: { category: string, amount: number, currency: string, headcount: number }) => void} onAdd
+ * @returns {HTMLElement}
+ */
+function renderAddCostItemForm(onAdd) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'cost-item-add-section';
+
+  const form = document.createElement('form');
+  form.className = 'cost-item-edit-form';
+  form.hidden = true;
+  const categoryOptions = Object.keys(CATEGORY_ICONS)
+    .map((category) => `<option value="${category}" ${category === '기타' ? 'selected' : ''}>${CATEGORY_ICONS[category]} ${category}</option>`)
+    .join('');
+  form.innerHTML = `
+    <select name="category" aria-label="분류">${categoryOptions}</select>
+    <input type="number" name="amount" placeholder="금액" min="0" step="1" aria-label="금액" required />
+    <select name="currency" aria-label="화폐">
+      <option value="KRW">KRW</option>
+      <option value="EUR">EUR</option>
+      <option value="CHF">CHF</option>
+    </select>
+    <input type="number" name="headcount" value="1" min="1" step="1" aria-label="인원" />
+    <button type="submit">추가</button>
+  `;
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const data = new FormData(form);
+    onAdd({
+      category: data.get('category'),
+      amount: Number(data.get('amount')),
+      currency: data.get('currency'),
+      headcount: Number(data.get('headcount')) || 1,
+    });
+    form.reset();
+    form.hidden = true;
+  });
+
+  const toggleButton = document.createElement('button');
+  toggleButton.type = 'button';
+  toggleButton.className = 'cost-item-add-button';
+  toggleButton.textContent = '+ 비용 추가';
+  toggleButton.addEventListener('click', () => {
+    form.hidden = !form.hidden;
+  });
+
+  wrapper.appendChild(toggleButton);
+  wrapper.appendChild(form);
+  return wrapper;
 }
 
 /**
@@ -404,6 +457,17 @@ function renderTimeBlock(block, rates, handlers, editMode) {
           resetButton.addEventListener('click', () => handlers.onResetCostItem(item.key));
           buttonGroup.appendChild(resetButton);
         }
+        if (item.isCustom) {
+          const deleteButton = document.createElement('button');
+          deleteButton.type = 'button';
+          deleteButton.className = 'cost-item-edit-button';
+          deleteButton.textContent = '삭제';
+          deleteButton.addEventListener('click', () => {
+            if (!window.confirm('이 비용 항목을 삭제할까요?')) return;
+            handlers.onResetCostItem(item.key);
+          });
+          buttonGroup.appendChild(deleteButton);
+        }
         li.appendChild(buttonGroup);
 
         const editForm = renderCostItemEditForm(item, handlers.onEditCostItem);
@@ -416,6 +480,13 @@ function renderTimeBlock(block, rates, handlers, editMode) {
         costList.appendChild(editForm);
       }
       more.appendChild(costList);
+    }
+
+    if (editMode) {
+      const anchorKey = block.blockKey || block.customId;
+      if (anchorKey) {
+        more.appendChild(renderAddCostItemForm((values) => handlers.onAddCostItem(anchorKey, values)));
+      }
     }
 
     wrapper.appendChild(more);
@@ -491,8 +562,10 @@ function renderAddBlockSection(dayId, onAdd) {
  * @param {string | null} todayDayId - 오늘 날짜와 일치하는 day.id (없으면 null)
  * @param {object} handlers - 비용/일정 편집 관련 핸들러 모음
  * @param {boolean} editMode
+ * @param {Set<string> | null} [openDayIds] - 이전 렌더링에서 열려있던 day.id 목록. 주어지면 이 상태를 그대로 복원하고,
+ *   없으면(최초 렌더링) todayDayId/첫 번째 카드를 여는 기본 로직을 쓴다.
  */
-export function renderDayList(listEl, itineraryData, rates, todayDayId, handlers, editMode) {
+export function renderDayList(listEl, itineraryData, rates, todayDayId, handlers, editMode, openDayIds = null) {
   listEl.innerHTML = '';
   itineraryData.forEach((day, index) => {
     const { accentVar, bgVar, flag } = getCountryAccent(day.region);
@@ -500,7 +573,10 @@ export function renderDayList(listEl, itineraryData, rates, todayDayId, handlers
     card.className = 'day-card';
     card.id = day.id;
     card.style.setProperty('--card-accent', `var(${accentVar})`);
-    if (day.id === todayDayId || (!todayDayId && index === 0)) {
+    const shouldOpen = openDayIds
+      ? openDayIds.has(day.id)
+      : day.id === todayDayId || (!todayDayId && index === 0);
+    if (shouldOpen) {
       card.open = true;
     }
 
