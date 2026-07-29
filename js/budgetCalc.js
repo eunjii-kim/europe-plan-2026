@@ -119,3 +119,52 @@ export function applyBudgetOverrides(itineraryData, overridesMap) {
     })),
   }));
 }
+
+/** 사용자가 새로 추가한 비용 항목의 키에서 anchorKey와 구분해주는 표시자 */
+const CUSTOM_COST_ITEM_MARKER = '__custom__';
+
+/**
+ * 블록의 anchorKey(원본 블록은 blockKey, 사용자가 추가한 블록은 customId)로부터
+ * 새 비용 항목의 키 접두사를 만든다.
+ * @param {string} anchorKey
+ * @returns {string}
+ */
+export function buildCustomCostItemKeyPrefix(anchorKey) {
+  return `${anchorKey}${CUSTOM_COST_ITEM_MARKER}`;
+}
+
+/**
+ * overridesMap에서 "원본에 없던, 사용자가 새로 추가한" 비용 항목만 뽑아 anchorKey별로 묶는다.
+ * @param {Map<string, { category: string, amount: number, currency: string, headcount: number }>} overridesMap
+ * @returns {Map<string, Array>}
+ */
+export function groupCustomCostItemsByAnchorKey(overridesMap) {
+  const grouped = new Map();
+  for (const [key, value] of overridesMap) {
+    const markerIndex = key.indexOf(CUSTOM_COST_ITEM_MARKER);
+    if (markerIndex === -1) continue;
+    const anchorKey = key.slice(0, markerIndex);
+    const list = grouped.get(anchorKey) || [];
+    list.push({ ...value, key, isCustom: true, overridden: false });
+    grouped.set(anchorKey, list);
+  }
+  return grouped;
+}
+
+/**
+ * 원본 블록(blockKey)과 사용자가 추가한 블록(customId) 구분 없이, anchorKey 기준으로
+ * 사용자가 새로 추가한 비용 항목을 costItems 뒤에 덧붙인다.
+ * @param {Array} itineraryData - applyScheduleOverrides까지 적용되어 blockKey/customId가 부여된 데이터
+ * @param {Map<string, Array>} customCostItemsMap - groupCustomCostItemsByAnchorKey의 결과
+ * @returns {Array}
+ */
+export function applyCustomCostItems(itineraryData, customCostItemsMap) {
+  return itineraryData.map((day) => ({
+    ...day,
+    timeBlocks: day.timeBlocks.map((block) => {
+      const anchorKey = block.blockKey || block.customId;
+      const extraItems = anchorKey ? customCostItemsMap.get(anchorKey) : undefined;
+      return extraItems ? { ...block, costItems: [...(block.costItems || []), ...extraItems] } : block;
+    }),
+  }));
+}
