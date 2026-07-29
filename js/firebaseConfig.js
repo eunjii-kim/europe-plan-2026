@@ -27,3 +27,15 @@ export const budgetItemsCollection = collection(db, 'trips', TRIP_ID, 'budgetIte
 
 /** trips/{TRIP_ID}/budgetOverrides 서브컬렉션 참조 (기존 일정 비용 수정값) */
 export const budgetOverridesCollection = collection(db, 'trips', TRIP_ID, 'budgetOverrides');
+
+/** trips/{TRIP_ID}/scheduleOverrides 서브컬렉션 참조 (기존 일정 시간/제목/메모 수정값) */
+export const scheduleOverridesCollection = collection(db, 'trips', TRIP_ID, 'scheduleOverrides');
+
+/** trips/{TRIP_ID}/scheduleCustomBlocks 서브컬렉션 참조 (사용자가 추가한 일정) */
+export const scheduleCustomBlocksCollection = collection(db, 'trips', TRIP_ID, 'scheduleCustomBlocks');
+
+/** trips/{TRIP_ID}/places 서브컬렉션 참조 (조사한 맛집/카페/쇼핑 정보) */
+export const placesCollection = collection(db, 'trips', TRIP_ID, 'places');
+
+/** trips/{TRIP_ID}/expenses 서브컬렉션 참조 (실제 지출 기록) */
+export const expensesCollection = collection(db, 'trips', TRIP_ID, 'expenses');
