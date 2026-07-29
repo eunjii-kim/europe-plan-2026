@@ -11,6 +11,8 @@
 - 편집모드(🔧)에서 일정 시간/제목/메모를 직접 수정하거나 새 일정을 추가/삭제 가능 (기기 간 실시간 공유)
 - 편집모드에서 일정 더보기에 이미지/링크 URL 첨부 가능
 - 추가 필요 예산 입력 (기기 간 실시간 공유)
+- 정보 탭: 조사한 맛집/카페/쇼핑 정보를 분류·지역과 함께 저장, 분류별로 필터링 (기기 간 실시간 공유)
+- 소비기록 탭: 실제 지출을 날짜/분류/지역과 함께 기록, 총액·카테고리별·국가별·지역별 통계와 예정 비용 대비 잔액 확인 (기기 간 실시간 공유)
 - 라이트/다크 모드 토글
 
 ## 로컬에서 실행하기
@@ -32,8 +34,10 @@ python3 -m http.server 8000
 - `trips/europe-plan-2026/budgetOverrides` — 원래 일정표 비용 항목을 수정한 값 (일정 탭의 "수정" 버튼으로 생성)
 - `trips/europe-plan-2026/scheduleOverrides` — 원래 일정표의 시간/제목/메모를 수정하거나 삭제한 값 (편집모드의 ✏️/🗑️ 버튼으로 생성)
 - `trips/europe-plan-2026/scheduleCustomBlocks` — 편집모드에서 새로 추가한 일정
+- `trips/europe-plan-2026/places` — 정보 탭에서 추가한 맛집/카페/쇼핑 정보
+- `trips/europe-plan-2026/expenses` — 소비기록 탭에서 추가한 지출 기록
 
-> ⚠️ **아래 규칙은 코드로 자동 적용되지 않습니다.** `scheduleOverrides`/`scheduleCustomBlocks`를 새로 추가했다면, Firebase 콘솔 → Firestore Database → 규칙 탭에서 아래 내용을 직접 붙여넣고 게시해야 편집모드 기능이 정상 동작합니다. 게시 전까지는 편집모드에서 저장을 시도하면 실패 안내 배너가 표시됩니다.
+> ⚠️ **아래 규칙은 코드로 자동 적용되지 않습니다.** `places`/`expenses`를 새로 추가했다면, Firebase 콘솔 → Firestore Database → 규칙 탭에서 아래 내용을 직접 붙여넣고 게시해야 정보/소비기록 탭 기능이 정상 동작합니다. 게시 전까지는 저장을 시도하면 실패 안내 배너가 표시됩니다.
 
 ```
 rules_version = '2';
@@ -81,6 +85,35 @@ service cloud.firestore {
                     && request.resource.data.note is string
                     && request.resource.data.note.size() <= 2000
                     && (!('attachments' in request.resource.data) || request.resource.data.attachments.size() <= 10);
+      allow delete: if true;
+    }
+    match /trips/europe-plan-2026/places/{placeId} {
+      allow read: if true;
+      allow create, update: if request.resource.data.category in ['맛집', '카페', '쇼핑', '기타']
+                    && request.resource.data.title is string
+                    && request.resource.data.title.size() <= 100
+                    && request.resource.data.region is string
+                    && request.resource.data.region.size() <= 50
+                    && request.resource.data.link is string
+                    && request.resource.data.link.size() <= 500
+                    && request.resource.data.memo is string
+                    && request.resource.data.memo.size() <= 200;
+      allow delete: if true;
+    }
+    match /trips/europe-plan-2026/expenses/{expenseId} {
+      allow read: if true;
+      allow create, update: if request.resource.data.date is string
+                    && request.resource.data.date.size() <= 10
+                    && request.resource.data.category is string
+                    && request.resource.data.category.size() <= 20
+                    && request.resource.data.title is string
+                    && request.resource.data.title.size() <= 100
+                    && request.resource.data.region is string
+                    && request.resource.data.region.size() <= 50
+                    && request.resource.data.amount is number
+                    && request.resource.data.amount >= 0
+                    && request.resource.data.amount <= 100000000
+                    && request.resource.data.currency in ['KRW', 'EUR', 'CHF'];
       allow delete: if true;
     }
     match /{document=**} {
