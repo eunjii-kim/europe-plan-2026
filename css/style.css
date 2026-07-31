@@ -895,13 +895,15 @@ main {
   font-size: 0.85rem;
 }
 
-.place-item-link {
+.place-item-link,
+.place-item-map-link {
   color: var(--primary);
   font-size: 0.85rem;
   text-decoration: none;
 }
 
-.place-item-link:hover {
+.place-item-link:hover,
+.place-item-map-link:hover {
   text-decoration: underline;
 }
 
