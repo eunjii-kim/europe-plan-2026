@@ -26,6 +26,7 @@
     <button type="button" class="tab-button" data-tab="budget" aria-selected="false">예산</button>
     <button type="button" class="tab-button" data-tab="info" aria-selected="false">정보</button>
     <button type="button" class="tab-button" data-tab="expense" aria-selected="false">소비기록</button>
+    <button type="button" class="tab-button" data-tab="checklist" aria-selected="false">체크리스트</button>
   </nav>
 
   <main>
@@ -122,6 +123,18 @@
       </form>
 
       <ul id="expenseList" class="expense-list"></ul>
+    </section>
+
+    <section id="checklistTab" class="tab-panel" hidden>
+      <p class="hint">준비물을 섹션별로 나눠 체크리스트로 관리하면 다른 기기와 실시간으로 공유됩니다.</p>
+      <p class="firebase-notice" hidden></p>
+
+      <form id="checklistSectionForm" class="checklist-section-form">
+        <input id="checklistSectionTitleInput" type="text" placeholder="섹션 이름 (예: 의류)" required maxlength="50" />
+        <button type="submit">섹션 추가</button>
+      </form>
+
+      <div id="checklistSectionList" class="checklist-section-list"></div>
     </section>
   </main>
 

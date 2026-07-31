@@ -13,6 +13,7 @@
 - 추가 필요 예산 입력 (기기 간 실시간 공유)
 - 정보 탭: 조사한 맛집/카페/쇼핑 정보를 분류·지역과 함께 저장, 분류별로 필터링 (기기 간 실시간 공유)
 - 소비기록 탭: 실제 지출을 날짜/분류/지역과 함께 기록, 총액·카테고리별·국가별·지역별 통계와 예정 비용 대비 잔액 확인 (기기 간 실시간 공유)
+- 체크리스트 탭: 섹션별로 준비물을 추가하고 체크박스/메모로 관리 (기기 간 실시간 공유)
 - 라이트/다크 모드 토글
 
 ## 로컬에서 실행하기
@@ -37,8 +38,10 @@ python3 -m http.server 8000
 - `trips/europe-plan-2026/places` — 정보 탭에서 추가한 맛집/카페/쇼핑 정보
 - `trips/europe-plan-2026/expenses` — 소비기록 탭에서 추가한 지출 기록
 - `trips/europe-plan-2026/customRegions` — 정보/소비기록 탭의 지역 select에서 "+ 새 지역 추가"로 등록한 지역/도시
+- `trips/europe-plan-2026/checklistSections` — 체크리스트 탭의 섹션(예: 의류, 전자기기)
+- `trips/europe-plan-2026/checklistItems` — 섹션별 준비물(체크 여부/메모 포함)
 
-> ⚠️ **아래 규칙은 코드로 자동 적용되지 않습니다.** `customRegions`를 새로 추가했다면, Firebase 콘솔 → Firestore Database → 규칙 탭에서 아래 내용을 직접 붙여넣고 게시해야 지역 추가 기능이 정상 동작합니다. 게시 전까지는 저장을 시도하면 실패 안내 배너가 표시됩니다.
+> ⚠️ **아래 규칙은 코드로 자동 적용되지 않습니다.** `customRegions`/`checklistSections`/`checklistItems`를 새로 추가했다면, Firebase 콘솔 → Firestore Database → 규칙 탭에서 아래 내용을 직접 붙여넣고 게시해야 지역 추가/체크리스트 탭 기능이 정상 동작합니다. 게시 전까지는 저장을 시도하면 실패 안내 배너가 표시됩니다.
 
 ```
 rules_version = '2';
@@ -126,6 +129,24 @@ service cloud.firestore {
                     && request.resource.data.name.size() >= 1
                     && request.resource.data.name.size() <= 50;
       allow update, delete: if false;
+    }
+    match /trips/europe-plan-2026/checklistSections/{sectionId} {
+      allow read: if true;
+      allow create, update: if request.resource.data.title is string
+                    && request.resource.data.title.size() >= 1
+                    && request.resource.data.title.size() <= 50;
+      allow delete: if true;
+    }
+    match /trips/europe-plan-2026/checklistItems/{itemId} {
+      allow read: if true;
+      allow create, update: if request.resource.data.sectionId is string
+                    && request.resource.data.title is string
+                    && request.resource.data.title.size() >= 1
+                    && request.resource.data.title.size() <= 100
+                    && request.resource.data.checked is bool
+                    && request.resource.data.memo is string
+                    && request.resource.data.memo.size() <= 200;
+      allow delete: if true;
     }
     match /{document=**} {
       allow read, write: if false;
