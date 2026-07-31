@@ -896,3 +896,137 @@ export function renderExpenseStats(el, expenses, rates, plannedTotalKrw) {
     remainingKrw >= 0 ? `예정 비용 대비 남은 예산: ${formatKrw(remainingKrw)}` : `예정 비용 초과: ${formatKrw(-remainingKrw)}`;
   el.appendChild(remainingLine);
 }
+
+/**
+ * 준비물이 없는 섹션에 새 준비물을 추가하는 인라인 토글 폼을 만든다.
+ * @param {(title: string) => void} onAdd
+ * @returns {HTMLElement}
+ */
+function renderAddChecklistItemForm(onAdd) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'checklist-item-add-section';
+
+  const form = document.createElement('form');
+  form.className = 'checklist-item-add-form';
+  form.hidden = true;
+  form.innerHTML = `
+    <input type="text" name="title" placeholder="준비물 이름" maxlength="100" required aria-label="준비물 이름" />
+    <button type="submit">추가</button>
+  `;
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const data = new FormData(form);
+    const title = data.get('title').trim();
+    if (!title) return;
+    onAdd(title);
+    form.reset();
+    form.hidden = true;
+  });
+
+  const toggleButton = document.createElement('button');
+  toggleButton.type = 'button';
+  toggleButton.className = 'checklist-item-add-button';
+  toggleButton.textContent = '+ 준비물 추가';
+  toggleButton.addEventListener('click', () => {
+    form.hidden = !form.hidden;
+  });
+
+  wrapper.appendChild(toggleButton);
+  wrapper.appendChild(form);
+  return wrapper;
+}
+
+/**
+ * 체크리스트 섹션 목록(섹션별 준비물 포함)을 렌더링한다.
+ * @param {HTMLElement} listEl
+ * @param {Array<{ id: string, title: string }>} sections
+ * @param {Map<string, Array<{ id: string, title: string, checked: boolean, memo: string }>>} itemsBySectionId
+ * @param {{
+ *   onDeleteSection: (sectionId: string) => void,
+ *   onAddItem: (sectionId: string, title: string) => void,
+ *   onDeleteItem: (itemId: string) => void,
+ *   onToggleItem: (itemId: string, checked: boolean) => void,
+ *   onMemoChange: (itemId: string, memo: string) => void,
+ * }} handlers
+ */
+export function renderChecklistSections(listEl, sections, itemsBySectionId, handlers) {
+  listEl.innerHTML = '';
+  if (sections.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'checklist-section-empty';
+    empty.textContent = '아직 추가한 섹션이 없습니다.';
+    listEl.appendChild(empty);
+    return;
+  }
+
+  for (const section of sections) {
+    const items = itemsBySectionId.get(section.id) || [];
+    const checkedCount = items.filter((item) => item.checked).length;
+
+    const sectionEl = document.createElement('div');
+    sectionEl.className = 'checklist-section';
+
+    const header = document.createElement('div');
+    header.className = 'checklist-section-header';
+    header.innerHTML = `
+      <h3 class="checklist-section-title">${escapeHtml(section.title)}</h3>
+      <span class="checklist-section-progress">${checkedCount}/${items.length}</span>
+    `;
+    const deleteSectionButton = document.createElement('button');
+    deleteSectionButton.type = 'button';
+    deleteSectionButton.className = 'checklist-section-delete';
+    deleteSectionButton.innerHTML = ICONS.trash;
+    deleteSectionButton.setAttribute('aria-label', '섹션 삭제');
+    deleteSectionButton.addEventListener('click', () => {
+      if (!window.confirm(`"${section.title}" 섹션과 그 안의 준비물을 모두 삭제할까요?`)) return;
+      handlers.onDeleteSection(section.id);
+    });
+    header.appendChild(deleteSectionButton);
+    sectionEl.appendChild(header);
+
+    const itemList = document.createElement('ul');
+    itemList.className = 'checklist-item-list';
+    for (const item of items) {
+      const li = document.createElement('li');
+      li.className = 'checklist-item';
+      li.classList.toggle('is-checked', !!item.checked);
+
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.className = 'checklist-item-checkbox';
+      checkbox.checked = !!item.checked;
+      checkbox.setAttribute('aria-label', `${item.title} 완료 체크`);
+      checkbox.addEventListener('change', () => handlers.onToggleItem(item.id, checkbox.checked));
+
+      const title = document.createElement('span');
+      title.className = 'checklist-item-title';
+      title.textContent = item.title;
+
+      const memoInput = document.createElement('input');
+      memoInput.type = 'text';
+      memoInput.className = 'checklist-item-memo';
+      memoInput.placeholder = '메모';
+      memoInput.setAttribute('aria-label', `${item.title} 메모`);
+      memoInput.value = item.memo || '';
+      memoInput.addEventListener('change', () => handlers.onMemoChange(item.id, memoInput.value.trim()));
+
+      const deleteItemButton = document.createElement('button');
+      deleteItemButton.type = 'button';
+      deleteItemButton.className = 'checklist-item-delete';
+      deleteItemButton.innerHTML = ICONS.x;
+      deleteItemButton.setAttribute('aria-label', '삭제');
+      deleteItemButton.addEventListener('click', () => handlers.onDeleteItem(item.id));
+
+      li.appendChild(checkbox);
+      li.appendChild(title);
+      li.appendChild(memoInput);
+      li.appendChild(deleteItemButton);
+      itemList.appendChild(li);
+    }
+    sectionEl.appendChild(itemList);
+
+    sectionEl.appendChild(renderAddChecklistItemForm((title) => handlers.onAddItem(section.id, title)));
+
+    listEl.appendChild(sectionEl);
+  }
+}

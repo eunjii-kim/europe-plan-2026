@@ -14,6 +14,7 @@ import {
   renderPlaceList,
   renderExpenseList,
   renderExpenseStats,
+  renderChecklistSections,
   PLACE_FILTER_ALL,
 } from './render.js';
 import { formatKrw, applyBudgetOverrides, applyCustomCostItems, groupCustomCostItemsByAnchorKey } from './budgetCalc.js';
@@ -39,6 +40,16 @@ import {
 } from './schedule.js';
 import { subscribeToPlaces, addPlace, deletePlace } from './places.js';
 import { subscribeToExpenses, addExpense, deleteExpense } from './expenses.js';
+import {
+  subscribeToChecklistSections,
+  addChecklistSection,
+  deleteChecklistSection,
+  subscribeToChecklistItems,
+  addChecklistItem,
+  deleteChecklistItem,
+  toggleChecklistItem,
+  updateChecklistItemMemo,
+} from './checklist.js';
 import { isFirebaseConfigured } from './firebaseConfig.js';
 
 /**
@@ -59,6 +70,7 @@ function setupTabs() {
     budget: document.getElementById('budgetTab'),
     info: document.getElementById('infoTab'),
     expense: document.getElementById('expenseTab'),
+    checklist: document.getElementById('checklistTab'),
   };
   buttons.forEach((button) => {
     button.addEventListener('click', () => {
@@ -258,6 +270,25 @@ function setupExpenseForm() {
   });
 }
 
+/** "체크리스트" 탭의 섹션 추가 폼 제출을 처리한다. */
+function setupChecklistSectionForm() {
+  const form = document.getElementById('checklistSectionForm');
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const titleInput = document.getElementById('checklistSectionTitleInput');
+    const title = titleInput.value.trim();
+    if (!title) return;
+
+    try {
+      await addChecklistSection(title);
+      form.reset();
+    } catch (error) {
+      console.error('체크리스트 섹션 추가 실패', error);
+      showFirebaseNotice();
+    }
+  });
+}
+
 /**
  * 일정 블록(기존 블록 또는 사용자가 추가한 블록)의 첨부 목록을 저장한다.
  * @param {object} block
@@ -288,6 +319,7 @@ async function main() {
   setupBudgetForm();
   setupPlaceForm();
   setupExpenseForm();
+  setupChecklistSectionForm();
 
   const tripRegions = [...new Set(itineraryData.map((day) => day.region))];
   populateRegionSelect(document.getElementById('placeRegionInput'), tripRegions);
@@ -437,6 +469,61 @@ async function main() {
     renderExpenseStats(document.getElementById('expenseStats'), latestExpenses, rates, plannedTotal);
   };
 
+  let latestChecklistSections = [];
+  let latestChecklistItems = [];
+  const renderChecklistTab = () => {
+    const itemsBySectionId = new Map();
+    for (const item of latestChecklistItems) {
+      const list = itemsBySectionId.get(item.sectionId) || [];
+      list.push(item);
+      itemsBySectionId.set(item.sectionId, list);
+    }
+    renderChecklistSections(document.getElementById('checklistSectionList'), latestChecklistSections, itemsBySectionId, {
+      onDeleteSection: async (sectionId) => {
+        try {
+          const itemsInSection = latestChecklistItems.filter((item) => item.sectionId === sectionId);
+          await Promise.all(itemsInSection.map((item) => deleteChecklistItem(item.id)));
+          await deleteChecklistSection(sectionId);
+        } catch (error) {
+          console.error('체크리스트 섹션 삭제 실패', error);
+          showFirebaseNotice();
+        }
+      },
+      onAddItem: async (sectionId, title) => {
+        try {
+          await addChecklistItem(sectionId, title);
+        } catch (error) {
+          console.error('체크리스트 준비물 추가 실패', error);
+          showFirebaseNotice();
+        }
+      },
+      onDeleteItem: async (itemId) => {
+        try {
+          await deleteChecklistItem(itemId);
+        } catch (error) {
+          console.error('체크리스트 준비물 삭제 실패', error);
+          showFirebaseNotice();
+        }
+      },
+      onToggleItem: async (itemId, checked) => {
+        try {
+          await toggleChecklistItem(itemId, checked);
+        } catch (error) {
+          console.error('체크리스트 준비물 체크 실패', error);
+          showFirebaseNotice();
+        }
+      },
+      onMemoChange: async (itemId, memo) => {
+        try {
+          await updateChecklistItemMemo(itemId, memo);
+        } catch (error) {
+          console.error('체크리스트 메모 저장 실패', error);
+          showFirebaseNotice();
+        }
+      },
+    });
+  };
+
   let latestBudgetOverridesMap = new Map();
   let latestScheduleOverridesMap = new Map();
   let latestCustomBlocksByDay = new Map();
@@ -490,6 +577,7 @@ async function main() {
   // Firestore 연결 여부와 상관없이 일정/예산 요약은 항상 먼저 보여준다.
   renderScheduleAndSummary();
   renderPlacesTab();
+  renderChecklistTab();
 
   if (!isFirebaseConfigured) {
     showFirebaseNotice();
@@ -514,6 +602,14 @@ async function main() {
     subscribeToExpenses((items) => {
       latestExpenses = items;
       renderExpenseTab();
+    }, () => showFirebaseNotice());
+    subscribeToChecklistSections((sections) => {
+      latestChecklistSections = sections;
+      renderChecklistTab();
+    }, () => showFirebaseNotice());
+    subscribeToChecklistItems((items) => {
+      latestChecklistItems = items;
+      renderChecklistTab();
     }, () => showFirebaseNotice());
   }
 }

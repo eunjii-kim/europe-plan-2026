@@ -39,3 +39,9 @@ export const placesCollection = collection(db, 'trips', TRIP_ID, 'places');
 
 /** trips/{TRIP_ID}/expenses 서브컬렉션 참조 (실제 지출 기록) */
 export const expensesCollection = collection(db, 'trips', TRIP_ID, 'expenses');
+
+/** trips/{TRIP_ID}/checklistSections 서브컬렉션 참조 (체크리스트 섹션) */
+export const checklistSectionsCollection = collection(db, 'trips', TRIP_ID, 'checklistSections');
+
+/** trips/{TRIP_ID}/checklistItems 서브컬렉션 참조 (섹션별 준비물) */
+export const checklistItemsCollection = collection(db, 'trips', TRIP_ID, 'checklistItems');
