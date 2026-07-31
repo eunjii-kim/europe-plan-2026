@@ -169,13 +169,16 @@ body {
   top: 0;
   z-index: 10;
   display: flex;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   background: var(--card);
   border-bottom: 1px solid var(--border);
 }
 
 .tab-button {
-  flex: 1;
-  padding: var(--spacing-3);
+  flex: 0 0 auto;
+  white-space: nowrap;
+  padding: var(--spacing-3) var(--spacing-4);
   border: none;
   background: none;
   font-family: var(--font-sans);
@@ -1106,6 +1109,14 @@ main {
 
   .budget-form input[type='text'] {
     flex: 3;
+  }
+
+  .tab-bar {
+    overflow-x: visible;
+  }
+
+  .tab-button {
+    flex: 1;
   }
 }
 
