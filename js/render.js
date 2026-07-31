@@ -802,6 +802,15 @@ export function renderPlaceList(listEl, items, regions, onDelete, onEdit) {
       li.appendChild(link);
     }
 
+    const mapQuery = [item.title, item.region].filter(Boolean).join(' ');
+    const mapLink = document.createElement('a');
+    mapLink.className = 'place-item-map-link';
+    mapLink.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapQuery)}`;
+    mapLink.target = '_blank';
+    mapLink.rel = 'noopener noreferrer';
+    mapLink.textContent = '🗺️ 지도에서 보기';
+    li.appendChild(mapLink);
+
     const editForm = renderPlaceEditForm(item, regions, (values) => {
       onEdit(item.id, values);
       editForm.hidden = true;
