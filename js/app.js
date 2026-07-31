@@ -495,7 +495,7 @@ async function main() {
     renderPlaceList(
       document.getElementById('placeList'),
       filtered,
-      tripRegions,
+      [...tripRegions, ...latestCustomRegions.map((r) => r.name)],
       async (id) => {
         try {
           await deletePlace(id);
@@ -609,6 +609,7 @@ async function main() {
     subscribeToCustomRegions((regions) => {
       latestCustomRegions = regions;
       refreshRegionSelects();
+      renderPlacesTab();
     }, () => showFirebaseNotice());
   }
 }
