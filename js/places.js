@@ -6,6 +6,7 @@ import {
   orderBy,
   query,
   serverTimestamp,
+  updateDoc,
 } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js';
 import { placesCollection } from './firebaseConfig.js';
 
@@ -53,4 +54,20 @@ export async function addPlace(place) {
  */
 export async function deletePlace(placeId) {
   await deleteDoc(doc(placesCollection, placeId));
+}
+
+/**
+ * 저장된 장소 정보를 수정한다.
+ * @param {string} placeId
+ * @param {{ category: string, title: string, region: string, link: string, memo: string }} values
+ * @returns {Promise<void>}
+ */
+export async function updatePlace(placeId, values) {
+  await updateDoc(doc(placesCollection, placeId), {
+    category: values.category,
+    title: values.title,
+    region: values.region || '',
+    link: values.link || '',
+    memo: values.memo || '',
+  });
 }
