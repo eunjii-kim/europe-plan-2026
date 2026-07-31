@@ -85,6 +85,15 @@ export const DEFAULT_EXPENSE_CATEGORY_ICON = '💰';
 /** 스위스 구간에 해당하는 지역명. 이 목록에 없는 지역은 이탈리아 구간으로 간주한다. */
 export const SWISS_REGIONS = new Set(['인터라켄', '그린델발트', '융프라우', '체르마트']);
 
+/**
+ * 정보/소비기록 탭의 지역 select에서 제외할 지역명.
+ * 일정표(day.region)에는 남아있지만, 장소/지출을 기록할 지역 선택지로는 부적절해 숨긴다.
+ */
+export const EXCLUDED_REGIONS = new Set(['남부투어', '자유일정', '로마 → 인천']);
+
+/** 지역 select 맨 아래 "+ 새 지역 추가" 옵션에 쓰는 sentinel value */
+export const ADD_NEW_REGION_VALUE = '__add_new_region__';
+
 /** localStorage에 라이트/다크 테마 선택값을 저장할 때 쓰는 키 */
 export const THEME_STORAGE_KEY = 'europePlan2026:theme';
 

@@ -888,6 +888,15 @@ main {
   white-space: nowrap;
 }
 
+.expense-item-headcount {
+  color: var(--muted-foreground);
+  font-size: 0.8rem;
+  white-space: nowrap;
+  padding: 2px 6px;
+  border-radius: var(--radius-pill);
+  background: var(--muted);
+}
+
 .place-item-memo {
   flex: 1 1 100%;
   margin: 0;
@@ -895,14 +904,29 @@ main {
   font-size: 0.85rem;
 }
 
-.place-item-link {
+.place-item-link,
+.place-item-map-link {
   color: var(--primary);
   font-size: 0.85rem;
   text-decoration: none;
 }
 
-.place-item-link:hover {
+.place-item-link:hover,
+.place-item-map-link:hover {
   text-decoration: underline;
+}
+
+.place-item-edit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--touch-target);
+  min-height: var(--touch-target);
+  margin-left: auto;
+  border: none;
+  background: none;
+  color: var(--muted-foreground);
+  cursor: pointer;
 }
 
 .place-item-delete,
@@ -912,10 +936,55 @@ main {
   justify-content: center;
   min-width: var(--touch-target);
   min-height: var(--touch-target);
-  margin-left: auto;
   border: none;
   background: none;
   color: var(--danger);
+  cursor: pointer;
+}
+
+.expense-item-delete {
+  margin-left: auto;
+}
+
+.place-edit-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-1);
+  align-items: center;
+  flex: 1 1 100%;
+  margin-top: var(--spacing-1);
+  padding-top: var(--spacing-1);
+  border-top: 1px dashed var(--border);
+}
+
+.place-edit-form input,
+.place-edit-form select {
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--background);
+  color: var(--foreground);
+  font-size: 0.8rem;
+}
+
+.place-edit-form textarea {
+  flex: 1 1 100%;
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--background);
+  color: var(--foreground);
+  font-size: 0.8rem;
+  resize: vertical;
+}
+
+.place-edit-form button {
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-size: 0.75rem;
+  padding: 4px 10px;
   cursor: pointer;
 }
 
