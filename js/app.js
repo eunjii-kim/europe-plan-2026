@@ -37,7 +37,7 @@ import {
   deleteScheduleCustomBlock,
   updateScheduleCustomBlockAttachments,
 } from './schedule.js';
-import { subscribeToPlaces, addPlace, deletePlace } from './places.js';
+import { subscribeToPlaces, addPlace, deletePlace, updatePlace } from './places.js';
 import { subscribeToExpenses, addExpense, deleteExpense } from './expenses.js';
 import { isFirebaseConfigured } from './firebaseConfig.js';
 
@@ -414,14 +414,27 @@ async function main() {
       placeFilterCategory = category;
       renderPlacesTab();
     });
-    renderPlaceList(document.getElementById('placeList'), filtered, async (id) => {
-      try {
-        await deletePlace(id);
-      } catch (error) {
-        console.error('장소 삭제 실패', error);
-        showFirebaseNotice();
-      }
-    });
+    renderPlaceList(
+      document.getElementById('placeList'),
+      filtered,
+      tripRegions,
+      async (id) => {
+        try {
+          await deletePlace(id);
+        } catch (error) {
+          console.error('장소 삭제 실패', error);
+          showFirebaseNotice();
+        }
+      },
+      async (id, values) => {
+        try {
+          await updatePlace(id, values);
+        } catch (error) {
+          console.error('장소 수정 실패', error);
+          showFirebaseNotice();
+        }
+      },
+    );
   };
 
   let latestExpenses = [];

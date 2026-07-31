@@ -713,12 +713,55 @@ export function renderPlaceFilters(containerEl, activeCategory, onSelect) {
 }
 
 /**
+ * 저장된 장소 정보를 수정하는 인라인 폼을 만든다.
+ * @param {{ category: string, title: string, region: string, link: string, memo: string }} item
+ * @param {string[]} regions - 지역 select에 채울 옵션 목록
+ * @param {(values: { category: string, title: string, region: string, link: string, memo: string }) => void} onSave
+ * @returns {HTMLFormElement}
+ */
+function renderPlaceEditForm(item, regions, onSave) {
+  const form = document.createElement('form');
+  form.className = 'place-edit-form';
+  const categoryOptions = PLACE_CATEGORIES
+    .map((category) => `<option value="${category}" ${category === item.category ? 'selected' : ''}>${PLACE_CATEGORY_ICONS[category]} ${category}</option>`)
+    .join('');
+  const regionOptions = regions
+    .map((region) => `<option value="${escapeHtml(region)}" ${region === item.region ? 'selected' : ''}>${escapeHtml(region)}</option>`)
+    .join('');
+  form.innerHTML = `
+    <select name="category" aria-label="분류">${categoryOptions}</select>
+    <input type="text" name="title" value="${escapeHtml(item.title)}" placeholder="이름" aria-label="이름" required />
+    <select name="region" aria-label="지역">
+      <option value="">지역 선택 안함</option>
+      ${regionOptions}
+    </select>
+    <input type="url" name="link" value="${escapeHtml(item.link || '')}" placeholder="링크" aria-label="링크" />
+    <textarea name="memo" placeholder="메모" aria-label="메모" maxlength="200">${escapeHtml(item.memo || '')}</textarea>
+    <button type="submit">저장</button>
+  `;
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const data = new FormData(form);
+    onSave({
+      category: data.get('category'),
+      title: data.get('title').trim(),
+      region: data.get('region'),
+      link: data.get('link').trim(),
+      memo: data.get('memo').trim(),
+    });
+  });
+  return form;
+}
+
+/**
  * 조사한 장소(맛집/카페/쇼핑 등) 목록을 렌더링한다.
  * @param {HTMLElement} listEl
  * @param {Array<{ id: string, category: string, title: string, region: string, link: string, memo: string }>} items
+ * @param {string[]} regions - 수정 폼의 지역 select에 채울 옵션 목록
  * @param {(id: string) => void} onDelete
+ * @param {(id: string, values: object) => void} onEdit
  */
-export function renderPlaceList(listEl, items, onDelete) {
+export function renderPlaceList(listEl, items, regions, onDelete, onEdit) {
   listEl.innerHTML = '';
   if (items.length === 0) {
     const empty = document.createElement('li');
@@ -759,6 +802,22 @@ export function renderPlaceList(listEl, items, onDelete) {
       li.appendChild(link);
     }
 
+    const editForm = renderPlaceEditForm(item, regions, (values) => {
+      onEdit(item.id, values);
+      editForm.hidden = true;
+    });
+    editForm.hidden = true;
+
+    const editButton = document.createElement('button');
+    editButton.type = 'button';
+    editButton.className = 'place-item-edit';
+    editButton.innerHTML = ICONS.pencil;
+    editButton.setAttribute('aria-label', '수정');
+    editButton.addEventListener('click', () => {
+      editForm.hidden = !editForm.hidden;
+    });
+    li.appendChild(editButton);
+
     const deleteButton = document.createElement('button');
     deleteButton.type = 'button';
     deleteButton.className = 'place-item-delete';
@@ -766,6 +825,8 @@ export function renderPlaceList(listEl, items, onDelete) {
     deleteButton.setAttribute('aria-label', '삭제');
     deleteButton.addEventListener('click', () => onDelete(item.id));
     li.appendChild(deleteButton);
+
+    li.appendChild(editForm);
 
     listEl.appendChild(li);
   }
