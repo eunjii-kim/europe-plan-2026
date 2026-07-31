@@ -169,13 +169,21 @@ body {
   top: 0;
   z-index: 10;
   display: flex;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
   background: var(--card);
   border-bottom: 1px solid var(--border);
 }
 
+.tab-bar::-webkit-scrollbar {
+  display: none;
+}
+
 .tab-button {
-  flex: 1;
-  padding: var(--spacing-3);
+  flex: 1 0 auto;
+  white-space: nowrap;
+  padding: var(--spacing-3) var(--spacing-4);
   border: none;
   background: none;
   font-family: var(--font-sans);
