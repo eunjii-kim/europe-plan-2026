@@ -778,7 +778,7 @@ const DEFAULT_COUNTRY_FLAG = '🌍';
 /**
  * 지출 기록 목록을 렌더링한다.
  * @param {HTMLElement} listEl
- * @param {Array<{ id: string, date: string, category: string, title: string, region: string, amount: number, currency: string }>} items
+ * @param {Array<{ id: string, date: string, category: string, title: string, region: string, amount: number, currency: string, headcount: number }>} items
  * @param {{ CHF: number, EUR: number }} rates
  * @param {(id: string) => void} onDelete
  */
@@ -797,11 +797,13 @@ export function renderExpenseList(listEl, items, rates, onDelete) {
     const icon = EXPENSE_CATEGORY_ICONS[item.category] || DEFAULT_EXPENSE_CATEGORY_ICON;
     const krwLabel = item.currency === 'KRW' ? '' : ` (${formatKrw(convertToKrw(item.amount, item.currency, rates))})`;
     const regionTag = item.region ? `<span class="expense-item-region">📍 ${escapeHtml(item.region)}</span>` : '';
+    const headcountTag = item.headcount > 1 ? `<span class="expense-item-headcount">${item.headcount}인</span>` : '';
     li.innerHTML = `
       <span class="expense-item-date">${escapeHtml(item.date)}</span>
       <span class="expense-item-category">${icon} ${escapeHtml(item.category)}</span>
       <span class="expense-item-title">${escapeHtml(item.title || '')}</span>
       ${regionTag}
+      ${headcountTag}
       <span class="expense-item-amount">${item.amount.toLocaleString('ko-KR')} ${item.currency}${krwLabel}</span>
       <button type="button" class="expense-item-delete" aria-label="삭제">${ICONS.x}</button>
     `;

@@ -113,7 +113,10 @@ service cloud.firestore {
                     && request.resource.data.amount is number
                     && request.resource.data.amount >= 0
                     && request.resource.data.amount <= 100000000
-                    && request.resource.data.currency in ['KRW', 'EUR', 'CHF'];
+                    && request.resource.data.currency in ['KRW', 'EUR', 'CHF']
+                    && request.resource.data.headcount is number
+                    && request.resource.data.headcount >= 1
+                    && request.resource.data.headcount <= 20;
       allow delete: if true;
     }
     match /{document=**} {
