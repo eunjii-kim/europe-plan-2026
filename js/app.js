@@ -281,6 +281,7 @@ function setupExpenseForm() {
     const titleInput = document.getElementById('expenseTitleInput');
     const amountInput = document.getElementById('expenseAmountInput');
     const currencyInput = document.getElementById('expenseCurrencyInput');
+    const headcountInput = document.getElementById('expenseHeadcountInput');
 
     const date = dateInput.value;
     const amount = Number(amountInput.value);
@@ -294,6 +295,7 @@ function setupExpenseForm() {
         title: titleInput.value.trim(),
         amount,
         currency: currencyInput.value,
+        headcount: Number(headcountInput.value) || 1,
       });
       form.reset();
       dateInput.value = date;

@@ -52,7 +52,7 @@ index.html
 - **`js/budget.js`**: Firestore와 실제로 통신하는 부분. 사용자가 추가한 예산 항목(`budgetItems`)과 기존 일정 비용 수정값(`budgetOverrides`) 두 서브컬렉션 모두 실시간 구독/추가·수정/삭제 함수를 제공한다.
 - **`js/schedule.js`**: `budget.js`와 동일한 패턴으로 일정 편집(`scheduleOverrides`)과 사용자가 추가한 일정(`scheduleCustomBlocks`)의 실시간 구독/추가·수정·삭제 함수를 제공한다. 첨부(attachments) 배열도 이 두 컬렉션의 문서 필드로 함께 저장된다. 첨부는 이미지/링크 URL만 지원한다 — 파일 업로드는 Firebase Storage가 2024년 10월부터 유료 요금제(Blaze)에서만 활성화되는 정책으로 바뀌어 지원하지 않기로 했다.
 - **`js/places.js`**: `budget.js`와 동일한 패턴으로 정보 탭의 장소(`places`) 실시간 구독/추가/수정/삭제 함수를 제공한다.
-- **`js/expenses.js`**: 소비기록(`expenses`) 실시간 구독/추가/삭제 함수를 제공한다. Firestore 쿼리에서 `date` 오름차순으로 정렬해 가져온다.
+- **`js/expenses.js`**: 소비기록(`expenses`) 실시간 구독/추가/삭제 함수를 제공한다. Firestore 쿼리에서 `date` 오름차순으로 정렬해 가져온다. 각 기록은 몇 명이 함께 결제했는지(`headcount`, 기본값 1)도 저장한다 — 추후 1인당 지출 계산의 기반이 된다(현재는 저장/표시만 하고 통계 계산에는 아직 반영하지 않음).
 - **`js/customRegions.js`**: `places.js`와 동일한 최소 패턴으로, 사용자가 지역 select의 "+ 새 지역 추가"로 등록한 지역/도시(`customRegions`) 실시간 구독/추가 함수를 제공한다(수정/삭제는 지원하지 않음).
 - **`js/app.js`**: 위 모듈들을 조립하는 오케스트레이터. 탭 전환(일정/예산/정보/소비기록), 라이트/다크 테마 토글, 편집모드 토글, 모두 펼치기/접기, 환율 조회 및 1시간 자동 갱신, 초기 렌더링, 예산/일정/정보/소비기록 폼 이벤트, Firestore 구독(예산 항목/비용 수정값/일정 수정값/추가 일정/장소/지출/커스텀 지역)을 연결한다. `itineraryData`에서 뽑은 지역 목록(`EXCLUDED_REGIONS`로 일부 제외)과 `customRegions`를 합쳐 정보·소비기록 폼의 지역 select를 채우고, select 맨 아래 "+ 새 지역 추가"를 고르면 이름을 입력받아 `customRegions`에 저장한 뒤 새 값을 자동 선택한다. 페이지 로드 시 가장 먼저 실행된다.
 

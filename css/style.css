@@ -888,6 +888,15 @@ main {
   white-space: nowrap;
 }
 
+.expense-item-headcount {
+  color: var(--muted-foreground);
+  font-size: 0.8rem;
+  white-space: nowrap;
+  padding: 2px 6px;
+  border-radius: var(--radius-pill);
+  background: var(--muted);
+}
+
 .place-item-memo {
   flex: 1 1 100%;
   margin: 0;
