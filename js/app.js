@@ -1,5 +1,13 @@
 import { itineraryData } from './data.js';
-import { TRIP_INFO, THEME_STORAGE_KEY, EDIT_MODE_STORAGE_KEY, EXCHANGE_RATE_REFRESH_INTERVAL_MS, ICONS } from './constants.js';
+import {
+  TRIP_INFO,
+  THEME_STORAGE_KEY,
+  EDIT_MODE_STORAGE_KEY,
+  EXCHANGE_RATE_REFRESH_INTERVAL_MS,
+  ICONS,
+  EXCLUDED_REGIONS,
+  ADD_NEW_REGION_VALUE,
+} from './constants.js';
 import { getExchangeRates } from './exchangeRate.js';
 import {
   computeDdayLabel,
@@ -37,8 +45,9 @@ import {
   deleteScheduleCustomBlock,
   updateScheduleCustomBlockAttachments,
 } from './schedule.js';
-import { subscribeToPlaces, addPlace, deletePlace } from './places.js';
+import { subscribeToPlaces, addPlace, deletePlace, updatePlace } from './places.js';
 import { subscribeToExpenses, addExpense, deleteExpense } from './expenses.js';
+import { subscribeToCustomRegions, addCustomRegion } from './customRegions.js';
 import { isFirebaseConfigured } from './firebaseConfig.js';
 
 /**
@@ -127,11 +136,14 @@ function setupEditModeToggle(onToggle) {
 }
 
 /**
- * select 요소에 지역 옵션 목록을 채운다. 첫 옵션은 "지역 선택 안함"이다.
+ * select 요소에 지역 옵션 목록을 채운다. 첫 옵션은 "지역 선택 안함", 마지막은 "+ 새 지역 추가"이다.
+ * 호출할 때마다 기존 옵션을 지우고 다시 채운다(사용자가 추가한 지역이 실시간으로 반영되므로).
  * @param {HTMLSelectElement} selectEl
  * @param {string[]} regions
  */
 function populateRegionSelect(selectEl, regions) {
+  selectEl.innerHTML = '';
+
   const emptyOption = document.createElement('option');
   emptyOption.value = '';
   emptyOption.textContent = '지역 선택 안함';
@@ -143,6 +155,40 @@ function populateRegionSelect(selectEl, regions) {
     option.textContent = region;
     selectEl.appendChild(option);
   }
+
+  const addNewOption = document.createElement('option');
+  addNewOption.value = ADD_NEW_REGION_VALUE;
+  addNewOption.textContent = '+ 새 지역 추가';
+  selectEl.appendChild(addNewOption);
+}
+
+/**
+ * 지역 select에서 "+ 새 지역 추가"를 골랐을 때 이름을 입력받아 Firestore에 저장한다.
+ * 취소하거나 빈 값이면 이전 선택값으로 되돌린다.
+ * @param {HTMLSelectElement} selectEl
+ * @param {(selectEl: HTMLSelectElement, name: string) => void} onAdd
+ */
+function setupRegionAddOption(selectEl, onAdd) {
+  selectEl.dataset.previousValue = selectEl.value;
+  selectEl.addEventListener('change', async () => {
+    if (selectEl.value !== ADD_NEW_REGION_VALUE) {
+      selectEl.dataset.previousValue = selectEl.value;
+      return;
+    }
+    const previousValue = selectEl.dataset.previousValue || '';
+    const name = (window.prompt('추가할 지역/도시 이름을 입력하세요') || '').trim();
+    if (!name) {
+      selectEl.value = previousValue;
+      return;
+    }
+    try {
+      await onAdd(selectEl, name);
+    } catch (error) {
+      console.error('지역 추가 실패', error);
+      showFirebaseNotice();
+      selectEl.value = previousValue;
+    }
+  });
 }
 
 /**
@@ -291,9 +337,41 @@ async function main() {
   setupPlaceForm();
   setupExpenseForm();
 
-  const tripRegions = [...new Set(itineraryData.map((day) => day.region))];
-  populateRegionSelect(document.getElementById('placeRegionInput'), tripRegions);
-  populateRegionSelect(document.getElementById('expenseRegionInput'), tripRegions);
+  const tripRegions = [...new Set(itineraryData.map((day) => day.region))].filter(
+    (region) => !EXCLUDED_REGIONS.has(region),
+  );
+  const placeRegionInput = document.getElementById('placeRegionInput');
+  const expenseRegionInput = document.getElementById('expenseRegionInput');
+
+  let latestCustomRegions = [];
+  let pendingRegionSelection = null;
+  const refreshRegionSelects = () => {
+    const regions = [...tripRegions, ...latestCustomRegions.map((r) => r.name)];
+    for (const selectEl of [placeRegionInput, expenseRegionInput]) {
+      const previousValue = selectEl.dataset.previousValue || '';
+      populateRegionSelect(selectEl, regions);
+      const nextValue =
+        pendingRegionSelection?.selectEl === selectEl ? pendingRegionSelection.name : previousValue;
+      if ([...selectEl.options].some((option) => option.value === nextValue)) {
+        selectEl.value = nextValue;
+      }
+      selectEl.dataset.previousValue = selectEl.value;
+    }
+    pendingRegionSelection = null;
+  };
+  refreshRegionSelects();
+
+  const onAddRegion = async (selectEl, name) => {
+    pendingRegionSelection = { selectEl, name };
+    try {
+      await addCustomRegion(name);
+    } catch (error) {
+      pendingRegionSelection = null;
+      throw error;
+    }
+  };
+  setupRegionAddOption(placeRegionInput, onAddRegion);
+  setupRegionAddOption(expenseRegionInput, onAddRegion);
 
   const expenseDateInput = document.getElementById('expenseDateInput');
   expenseDateInput.min = TRIP_INFO.startDate;
@@ -416,14 +494,27 @@ async function main() {
       placeFilterCategory = category;
       renderPlacesTab();
     });
-    renderPlaceList(document.getElementById('placeList'), filtered, async (id) => {
-      try {
-        await deletePlace(id);
-      } catch (error) {
-        console.error('장소 삭제 실패', error);
-        showFirebaseNotice();
-      }
-    });
+    renderPlaceList(
+      document.getElementById('placeList'),
+      filtered,
+      [...tripRegions, ...latestCustomRegions.map((r) => r.name)],
+      async (id) => {
+        try {
+          await deletePlace(id);
+        } catch (error) {
+          console.error('장소 삭제 실패', error);
+          showFirebaseNotice();
+        }
+      },
+      async (id, values) => {
+        try {
+          await updatePlace(id, values);
+        } catch (error) {
+          console.error('장소 수정 실패', error);
+          showFirebaseNotice();
+        }
+      },
+    );
   };
 
   let latestExpenses = [];
@@ -516,6 +607,11 @@ async function main() {
     subscribeToExpenses((items) => {
       latestExpenses = items;
       renderExpenseTab();
+    }, () => showFirebaseNotice());
+    subscribeToCustomRegions((regions) => {
+      latestCustomRegions = regions;
+      refreshRegionSelects();
+      renderPlacesTab();
     }, () => showFirebaseNotice());
   }
 }

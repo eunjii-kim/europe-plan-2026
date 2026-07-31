@@ -39,3 +39,6 @@ export const placesCollection = collection(db, 'trips', TRIP_ID, 'places');
 
 /** trips/{TRIP_ID}/expenses 서브컬렉션 참조 (실제 지출 기록) */
 export const expensesCollection = collection(db, 'trips', TRIP_ID, 'expenses');
+
+/** trips/{TRIP_ID}/customRegions 서브컬렉션 참조 (사용자가 추가한 지역/도시) */
+export const customRegionsCollection = collection(db, 'trips', TRIP_ID, 'customRegions');

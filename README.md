@@ -36,8 +36,9 @@ python3 -m http.server 8000
 - `trips/europe-plan-2026/scheduleCustomBlocks` — 편집모드에서 새로 추가한 일정
 - `trips/europe-plan-2026/places` — 정보 탭에서 추가한 맛집/카페/쇼핑 정보
 - `trips/europe-plan-2026/expenses` — 소비기록 탭에서 추가한 지출 기록
+- `trips/europe-plan-2026/customRegions` — 정보/소비기록 탭의 지역 select에서 "+ 새 지역 추가"로 등록한 지역/도시
 
-> ⚠️ **아래 규칙은 코드로 자동 적용되지 않습니다.** `places`/`expenses`를 새로 추가했다면, Firebase 콘솔 → Firestore Database → 규칙 탭에서 아래 내용을 직접 붙여넣고 게시해야 정보/소비기록 탭 기능이 정상 동작합니다. 게시 전까지는 저장을 시도하면 실패 안내 배너가 표시됩니다.
+> ⚠️ **아래 규칙은 코드로 자동 적용되지 않습니다.** `customRegions`를 새로 추가했다면, Firebase 콘솔 → Firestore Database → 규칙 탭에서 아래 내용을 직접 붙여넣고 게시해야 지역 추가 기능이 정상 동작합니다. 게시 전까지는 저장을 시도하면 실패 안내 배너가 표시됩니다.
 
 ```
 rules_version = '2';
@@ -118,6 +119,13 @@ service cloud.firestore {
                     && request.resource.data.headcount >= 1
                     && request.resource.data.headcount <= 20;
       allow delete: if true;
+    }
+    match /trips/europe-plan-2026/customRegions/{regionId} {
+      allow read: if true;
+      allow create: if request.resource.data.name is string
+                    && request.resource.data.name.size() >= 1
+                    && request.resource.data.name.size() <= 50;
+      allow update, delete: if false;
     }
     match /{document=**} {
       allow read, write: if false;
