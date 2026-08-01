@@ -6,6 +6,7 @@ import {
   orderBy,
   query,
   serverTimestamp,
+  updateDoc,
 } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js';
 import { expensesCollection } from './firebaseConfig.js';
 
@@ -61,4 +62,22 @@ export async function addExpense(expense) {
  */
 export async function deleteExpense(expenseId) {
   await deleteDoc(doc(expensesCollection, expenseId));
+}
+
+/**
+ * 지출 기록을 수정한다.
+ * @param {string} expenseId
+ * @param {{ date: string, category: string, title: string, region: string, amount: number, currency: string, headcount: number }} values
+ * @returns {Promise<void>}
+ */
+export async function updateExpense(expenseId, values) {
+  await updateDoc(doc(expensesCollection, expenseId), {
+    date: values.date,
+    category: values.category,
+    title: values.title || '',
+    region: values.region || '',
+    amount: values.amount,
+    currency: values.currency,
+    headcount: values.headcount || 1,
+  });
 }

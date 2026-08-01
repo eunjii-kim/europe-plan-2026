@@ -98,31 +98,39 @@
       <p class="hint">여행 중 실제로 쓴 금액을 기록하면 예정 비용과 비교한 통계를 볼 수 있습니다.</p>
       <p class="firebase-notice" hidden></p>
 
-      <div id="expenseStats" class="expense-stats"></div>
+      <details id="expenseStats" class="expense-stats">
+        <summary>통계 보기</summary>
+      </details>
 
       <form id="expenseForm" class="expense-form">
-        <input id="expenseDateInput" type="date" required />
-        <select id="expenseCategoryInput" aria-label="분류">
-          <option value="식비">식비</option>
-          <option value="교통">교통</option>
-          <option value="숙소">숙소</option>
-          <option value="쇼핑">쇼핑</option>
-          <option value="입장료/투어">입장료/투어</option>
-          <option value="기타">기타</option>
-        </select>
-        <select id="expenseRegionInput" aria-label="지역"></select>
-        <input id="expenseTitleInput" type="text" placeholder="항목명 (선택)" maxlength="100" />
-        <input id="expenseAmountInput" type="number" placeholder="금액" required min="0" step="1" />
-        <select id="expenseCurrencyInput" aria-label="화폐">
-          <option value="KRW">KRW</option>
-          <option value="EUR">EUR</option>
-          <option value="CHF">CHF</option>
-        </select>
-        <input id="expenseHeadcountInput" type="number" placeholder="인원" aria-label="인원" min="1" step="1" value="1" />
+        <div class="expense-form-row expense-form-row-top">
+          <input id="expenseDateInput" type="date" required />
+          <select id="expenseCategoryInput" aria-label="분류">
+            <option value="식비">식비</option>
+            <option value="교통">교통</option>
+            <option value="숙소">숙소</option>
+            <option value="쇼핑">쇼핑</option>
+            <option value="입장료/투어">입장료/투어</option>
+            <option value="기타">기타</option>
+          </select>
+          <select id="expenseRegionInput" aria-label="지역"></select>
+        </div>
+        <div class="expense-form-row expense-form-row-title">
+          <input id="expenseTitleInput" type="text" placeholder="항목명 (선택)" maxlength="100" />
+        </div>
+        <div class="expense-form-row expense-form-row-amount">
+          <input id="expenseAmountInput" type="number" placeholder="금액" required min="0" step="1" />
+          <select id="expenseCurrencyInput" aria-label="화폐">
+            <option value="KRW">KRW</option>
+            <option value="EUR">EUR</option>
+            <option value="CHF">CHF</option>
+          </select>
+          <input id="expenseHeadcountInput" type="number" placeholder="1(인원)" aria-label="인원" min="1" step="1" />
+        </div>
         <button type="submit">기록</button>
       </form>
 
-      <ul id="expenseList" class="expense-list"></ul>
+      <div id="expenseList" class="expense-table-wrapper"></div>
     </section>
 
     <section id="checklistTab" class="tab-panel" hidden>

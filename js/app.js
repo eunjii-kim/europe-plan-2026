@@ -47,7 +47,7 @@ import {
   updateScheduleCustomBlockAttachments,
 } from './schedule.js';
 import { subscribeToPlaces, addPlace, deletePlace, updatePlace, toggleFavoritePlace } from './places.js';
-import { subscribeToExpenses, addExpense, deleteExpense } from './expenses.js';
+import { subscribeToExpenses, addExpense, deleteExpense, updateExpense } from './expenses.js';
 import {
   subscribeToChecklistSections,
   addChecklistSection,
@@ -577,15 +577,29 @@ async function main() {
 
   let latestExpenses = [];
   const renderExpenseTab = () => {
-    renderExpenseList(document.getElementById('expenseList'), latestExpenses, rates, async (id) => {
-      try {
-        await deleteExpense(id);
-      } catch (error) {
-        console.error('지출 기록 삭제 실패', error);
-        showFirebaseNotice();
-      }
-    });
-    renderExpenseStats(document.getElementById('expenseStats'), latestExpenses, rates, plannedTotal);
+    renderExpenseList(
+      document.getElementById('expenseList'),
+      latestExpenses,
+      rates,
+      async (id) => {
+        try {
+          await deleteExpense(id);
+        } catch (error) {
+          console.error('지출 기록 삭제 실패', error);
+          showFirebaseNotice();
+        }
+      },
+      async (id, values) => {
+        try {
+          await updateExpense(id, values);
+        } catch (error) {
+          console.error('지출 기록 수정 실패', error);
+          showFirebaseNotice();
+        }
+      },
+      [...tripRegions, ...latestCustomRegions.map((r) => r.name)],
+    );
+    renderExpenseStats(document.getElementById('expenseStats'), latestExpenses, rates);
   };
 
   let latestChecklistSections = [];
