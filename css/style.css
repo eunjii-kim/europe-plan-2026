@@ -981,6 +981,8 @@ main {
   justify-content: center;
   min-width: var(--touch-target);
   min-height: var(--touch-target);
+  margin-left: auto;
+  align-self: center;
   border: none;
   background: none;
   color: var(--danger);

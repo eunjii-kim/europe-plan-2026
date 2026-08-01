@@ -795,6 +795,18 @@ export function renderPlaceList(listEl, items, regions, onDelete, onEdit, onTogg
       <span class="place-item-title">${escapeHtml(item.title)}</span>
       ${regionTag}
     `;
+
+    const deleteButton = document.createElement('button');
+    deleteButton.type = 'button';
+    deleteButton.className = 'place-item-delete';
+    deleteButton.innerHTML = ICONS.x;
+    deleteButton.setAttribute('aria-label', '삭제');
+    deleteButton.addEventListener('click', () => {
+      if (!window.confirm(`"${item.title}" 항목을 삭제할까요?`)) return;
+      onDelete(item.id);
+    });
+    main.appendChild(deleteButton);
+
     li.appendChild(main);
 
     if (item.memo) {
@@ -847,14 +859,6 @@ export function renderPlaceList(listEl, items, regions, onDelete, onEdit, onTogg
       editForm.hidden = !editForm.hidden;
     });
     li.appendChild(editButton);
-
-    const deleteButton = document.createElement('button');
-    deleteButton.type = 'button';
-    deleteButton.className = 'place-item-delete';
-    deleteButton.innerHTML = ICONS.x;
-    deleteButton.setAttribute('aria-label', '삭제');
-    deleteButton.addEventListener('click', () => onDelete(item.id));
-    li.appendChild(deleteButton);
 
     li.appendChild(editForm);
 
