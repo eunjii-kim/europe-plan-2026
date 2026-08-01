@@ -771,25 +771,47 @@ main {
 }
 
 .budget-form,
-.place-form,
-.expense-form {
+.place-form {
   display: flex;
   flex-wrap: wrap;
   gap: var(--spacing-2);
   margin-top: var(--spacing-3);
 }
 
+.expense-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+  margin-top: var(--spacing-3);
+}
+
+.expense-form-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-2);
+}
+
+.expense-form-row-top select,
+.expense-form-row-top input,
+.expense-form-row-amount input,
+.expense-form-row-amount select {
+  flex: 1;
+  min-width: 90px;
+}
+
+.expense-form-row-title input {
+  flex: 1 1 100%;
+  width: 100%;
+}
+
 .budget-form input[type='text'],
-.place-form input[type='text'],
-.expense-form input[type='text'] {
+.place-form input[type='text'] {
   flex: 2;
   min-width: 120px;
 }
 
 .budget-form input[type='number'],
-.place-form input[type='url'],
-.expense-form input[type='number'],
-.expense-form input[type='date'] {
+.place-form input[type='url'] {
   flex: 1;
   min-width: 80px;
 }
@@ -862,8 +884,7 @@ main {
   font-weight: 700;
 }
 
-.place-list,
-.expense-list {
+.place-list {
   list-style: none;
   padding: 0;
   margin: var(--spacing-3) 0 0;
@@ -872,8 +893,7 @@ main {
   gap: var(--spacing-2);
 }
 
-.place-list-item,
-.expense-list-item {
+.place-list-item {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -891,32 +911,20 @@ main {
   flex: 1 1 100%;
 }
 
-.place-item-category,
-.expense-item-category {
+.place-item-category {
   color: var(--muted-foreground);
   font-size: 0.85rem;
   white-space: nowrap;
 }
 
-.place-item-title,
-.expense-item-title {
+.place-item-title {
   font-weight: 600;
 }
 
-.place-item-region,
-.expense-item-region {
+.place-item-region {
   color: var(--muted-foreground);
   font-size: 0.8rem;
   white-space: nowrap;
-}
-
-.expense-item-headcount {
-  color: var(--muted-foreground);
-  font-size: 0.8rem;
-  white-space: nowrap;
-  padding: 2px 6px;
-  border-radius: var(--radius-pill);
-  background: var(--muted);
 }
 
 .place-item-memo {
@@ -967,8 +975,7 @@ main {
   cursor: pointer;
 }
 
-.place-item-delete,
-.expense-item-delete {
+.place-item-delete {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -978,10 +985,6 @@ main {
   background: none;
   color: var(--danger);
   cursor: pointer;
-}
-
-.expense-item-delete {
-  margin-left: auto;
 }
 
 .place-edit-form {
@@ -1034,16 +1037,81 @@ main {
   padding: var(--spacing-3);
 }
 
-.expense-item-date {
-  font-size: 0.8rem;
-  color: var(--muted-foreground);
-  white-space: nowrap;
+.expense-table-wrapper {
+  overflow-x: auto;
+  margin-top: var(--spacing-3);
 }
 
-.expense-item-amount {
-  color: var(--muted-foreground);
-  font-size: 0.85rem;
+.expense-table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+}
+
+.expense-table th,
+.expense-table td {
+  padding: var(--spacing-2);
+  border-bottom: 1px solid var(--border);
   white-space: nowrap;
+  text-align: left;
+  font-size: 0.85rem;
+}
+
+.expense-table thead th {
+  color: var(--muted-foreground);
+  font-weight: 600;
+}
+
+.expense-edit-row td {
+  background: var(--muted);
+  white-space: normal;
+}
+
+.expense-item-edit,
+.expense-item-delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  min-height: 32px;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+.expense-item-edit {
+  color: var(--muted-foreground);
+}
+
+.expense-item-delete {
+  color: var(--danger);
+}
+
+.expense-edit-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-1);
+  align-items: center;
+}
+
+.expense-edit-form input,
+.expense-edit-form select {
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--background);
+  color: var(--foreground);
+  font-size: 0.8rem;
+}
+
+.expense-edit-form button {
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-size: 0.75rem;
+  padding: 4px 10px;
+  cursor: pointer;
 }
 
 .expense-stats {
@@ -1053,6 +1121,23 @@ main {
   border-radius: var(--radius);
   padding: var(--spacing-4);
   margin-top: var(--spacing-3);
+}
+
+.expense-stats > summary {
+  cursor: pointer;
+  min-height: var(--touch-target);
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  list-style: none;
+}
+
+.expense-stats > summary::-webkit-details-marker {
+  display: none;
+}
+
+.expense-stats[open] > summary {
+  margin-bottom: var(--spacing-2);
 }
 
 .expense-breakdown-title {

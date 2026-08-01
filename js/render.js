@@ -6,6 +6,7 @@ import {
   PLACE_CATEGORIES,
   PLACE_CATEGORY_ICONS,
   DEFAULT_PLACE_CATEGORY_ICON,
+  EXPENSE_CATEGORIES,
   EXPENSE_CATEGORY_ICONS,
   DEFAULT_EXPENSE_CATEGORY_ICON,
 } from './constants.js';
@@ -866,40 +867,148 @@ const COUNTRY_FLAGS = { 스위스: '🇨🇭', 이탈리아: '🇮🇹' };
 const DEFAULT_COUNTRY_FLAG = '🌍';
 
 /**
- * 지출 기록 목록을 렌더링한다.
- * @param {HTMLElement} listEl
+ * 지출 기록을 수정하는 인라인 폼을 만든다. 테이블 행(colspan) 안에 통째로 들어간다.
+ * @param {{ date: string, category: string, title: string, region: string, amount: number, currency: string, headcount: number }} item
+ * @param {string[]} regions - 지역 select에 채울 옵션 목록
+ * @param {(values: object) => void} onSave
+ * @returns {HTMLFormElement}
+ */
+function renderExpenseEditForm(item, regions, onSave) {
+  const form = document.createElement('form');
+  form.className = 'expense-edit-form';
+  const categoryOptions = EXPENSE_CATEGORIES
+    .map(
+      (category) =>
+        `<option value="${category}" ${category === item.category ? 'selected' : ''}>${EXPENSE_CATEGORY_ICONS[category]} ${category}</option>`,
+    )
+    .join('');
+  const regionOptions = regions
+    .map((region) => `<option value="${escapeHtml(region)}" ${region === item.region ? 'selected' : ''}>${escapeHtml(region)}</option>`)
+    .join('');
+  form.innerHTML = `
+    <input type="date" name="date" value="${escapeHtml(item.date)}" required aria-label="날짜" />
+    <select name="category" aria-label="분류">${categoryOptions}</select>
+    <select name="region" aria-label="지역">
+      <option value="">지역 선택 안함</option>
+      ${regionOptions}
+    </select>
+    <input type="text" name="title" value="${escapeHtml(item.title || '')}" placeholder="항목명 (선택)" aria-label="항목명" maxlength="100" />
+    <input type="number" name="amount" value="${item.amount}" placeholder="금액" required min="0" step="1" aria-label="금액" />
+    <select name="currency" aria-label="화폐">
+      <option value="KRW" ${item.currency === 'KRW' ? 'selected' : ''}>KRW</option>
+      <option value="EUR" ${item.currency === 'EUR' ? 'selected' : ''}>EUR</option>
+      <option value="CHF" ${item.currency === 'CHF' ? 'selected' : ''}>CHF</option>
+    </select>
+    <input type="number" name="headcount" value="${item.headcount || 1}" placeholder="1(인원)" min="1" step="1" aria-label="인원" />
+    <button type="submit">저장</button>
+  `;
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const data = new FormData(form);
+    onSave({
+      date: data.get('date'),
+      category: data.get('category'),
+      region: data.get('region'),
+      title: data.get('title').trim(),
+      amount: Number(data.get('amount')),
+      currency: data.get('currency'),
+      headcount: Number(data.get('headcount')) || 1,
+    });
+  });
+  return form;
+}
+
+/**
+ * 지출 기록 목록을 테이블로 렌더링한다.
+ * @param {HTMLElement} listEl - <table>을 담을 컨테이너(가로 스크롤 래퍼)
  * @param {Array<{ id: string, date: string, category: string, title: string, region: string, amount: number, currency: string, headcount: number }>} items
  * @param {{ CHF: number, EUR: number }} rates
  * @param {(id: string) => void} onDelete
+ * @param {(id: string, values: object) => void} onEdit
+ * @param {string[]} regions - 수정 폼의 지역 select에 채울 옵션 목록
  */
-export function renderExpenseList(listEl, items, rates, onDelete) {
+export function renderExpenseList(listEl, items, rates, onDelete, onEdit, regions) {
   listEl.innerHTML = '';
   if (items.length === 0) {
-    const empty = document.createElement('li');
+    const empty = document.createElement('p');
     empty.className = 'expense-list-empty';
     empty.textContent = '아직 기록한 지출이 없습니다.';
     listEl.appendChild(empty);
     return;
   }
+
+  const table = document.createElement('table');
+  table.className = 'expense-table';
+  table.innerHTML = `
+    <thead>
+      <tr>
+        <th>날짜</th>
+        <th>분류</th>
+        <th>항목명</th>
+        <th>지역</th>
+        <th>금액</th>
+        <th>화폐</th>
+        <th>인원</th>
+        <th>수정</th>
+        <th>삭제</th>
+      </tr>
+    </thead>
+  `;
+  const tbody = document.createElement('tbody');
+
   for (const item of items) {
-    const li = document.createElement('li');
-    li.className = 'expense-list-item';
     const icon = EXPENSE_CATEGORY_ICONS[item.category] || DEFAULT_EXPENSE_CATEGORY_ICON;
     const krwLabel = item.currency === 'KRW' ? '' : ` (${formatKrw(convertToKrw(item.amount, item.currency, rates))})`;
-    const regionTag = item.region ? `<span class="expense-item-region">📍 ${escapeHtml(item.region)}</span>` : '';
-    const headcountTag = item.headcount > 1 ? `<span class="expense-item-headcount">${item.headcount}인</span>` : '';
-    li.innerHTML = `
-      <span class="expense-item-date">${escapeHtml(item.date)}</span>
-      <span class="expense-item-category">${icon} ${escapeHtml(item.category)}</span>
-      <span class="expense-item-title">${escapeHtml(item.title || '')}</span>
-      ${regionTag}
-      ${headcountTag}
-      <span class="expense-item-amount">${item.amount.toLocaleString('ko-KR')} ${item.currency}${krwLabel}</span>
-      <button type="button" class="expense-item-delete" aria-label="삭제">${ICONS.x}</button>
+
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td>${escapeHtml(item.date)}</td>
+      <td>${icon} ${escapeHtml(item.category)}</td>
+      <td>${escapeHtml(item.title || '')}</td>
+      <td>${item.region ? `📍 ${escapeHtml(item.region)}` : ''}</td>
+      <td>${item.amount.toLocaleString('ko-KR')}${krwLabel}</td>
+      <td>${item.currency}</td>
+      <td>${item.headcount > 1 ? `${item.headcount}인` : ''}</td>
+      <td></td>
+      <td></td>
     `;
-    li.querySelector('.expense-item-delete').addEventListener('click', () => onDelete(item.id));
-    listEl.appendChild(li);
+
+    const editRow = document.createElement('tr');
+    editRow.className = 'expense-edit-row';
+    editRow.hidden = true;
+    const editRowCell = document.createElement('td');
+    editRowCell.colSpan = 9;
+    const editForm = renderExpenseEditForm(item, regions, (values) => {
+      onEdit(item.id, values);
+      editRow.hidden = true;
+    });
+    editRowCell.appendChild(editForm);
+    editRow.appendChild(editRowCell);
+
+    const editButton = document.createElement('button');
+    editButton.type = 'button';
+    editButton.className = 'expense-item-edit';
+    editButton.innerHTML = ICONS.pencil;
+    editButton.setAttribute('aria-label', '수정');
+    editButton.addEventListener('click', () => {
+      editRow.hidden = !editRow.hidden;
+    });
+    row.children[7].appendChild(editButton);
+
+    const deleteButton = document.createElement('button');
+    deleteButton.type = 'button';
+    deleteButton.className = 'expense-item-delete';
+    deleteButton.innerHTML = ICONS.x;
+    deleteButton.setAttribute('aria-label', '삭제');
+    deleteButton.addEventListener('click', () => onDelete(item.id));
+    row.children[8].appendChild(deleteButton);
+
+    tbody.appendChild(row);
+    tbody.appendChild(editRow);
   }
+
+  table.appendChild(tbody);
+  listEl.appendChild(table);
 }
 
 /**
@@ -941,17 +1050,18 @@ function renderExpenseBreakdownSection(title, groups, labelKey, resolveIcon) {
 }
 
 /**
- * 지출 통계(총합, 카테고리·지역·국가별 소계, 예산 대비 잔액)를 렌더링한다.
+ * 지출 통계(총합, 카테고리·지역·국가별 소계)를 렌더링한다.
+ * el은 <summary>를 담고 있는 <details> 요소이므로, summary는 보존한 채 나머지 내용만 다시 그린다.
  * @param {HTMLElement} el
  * @param {Array<{ category: string, region: string, amount: number, currency: string }>} expenses
  * @param {{ CHF: number, EUR: number }} rates
- * @param {number} plannedTotalKrw - 예산 탭에서 계산된 1인 예정 비용 총합(KRW)
  */
-export function renderExpenseStats(el, expenses, rates, plannedTotalKrw) {
+export function renderExpenseStats(el, expenses, rates) {
   const totalKrw = calcExpenseTotalKrw(expenses, rates);
-  const remainingKrw = plannedTotalKrw - totalKrw;
 
+  const summary = el.querySelector('summary');
   el.innerHTML = '';
+  if (summary) el.appendChild(summary);
 
   const totalLine = document.createElement('p');
   totalLine.className = 'total-line';
@@ -981,12 +1091,6 @@ export function renderExpenseStats(el, expenses, rates, plannedTotalKrw) {
     () => '📍',
   );
   if (regionSection) el.appendChild(regionSection);
-
-  const remainingLine = document.createElement('p');
-  remainingLine.className = `total-line expense-remaining-line${remainingKrw < 0 ? ' is-over' : ''}`;
-  remainingLine.textContent =
-    remainingKrw >= 0 ? `예정 비용 대비 남은 예산: ${formatKrw(remainingKrw)}` : `예정 비용 초과: ${formatKrw(-remainingKrw)}`;
-  el.appendChild(remainingLine);
 }
 
 /**
