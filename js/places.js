@@ -43,6 +43,7 @@ export async function addPlace(place) {
     region: place.region || '',
     link: place.link || '',
     memo: place.memo || '',
+    favorite: place.favorite || false,
     createdAt: serverTimestamp(),
   });
 }
@@ -70,4 +71,14 @@ export async function updatePlace(placeId, values) {
     link: values.link || '',
     memo: values.memo || '',
   });
+}
+
+/**
+ * 장소의 즐겨찾기 여부를 바꾼다.
+ * @param {string} placeId
+ * @param {boolean} favorite
+ * @returns {Promise<void>}
+ */
+export async function toggleFavoritePlace(placeId, favorite) {
+  await updateDoc(doc(placesCollection, placeId), { favorite });
 }

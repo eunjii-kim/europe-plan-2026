@@ -848,6 +848,20 @@ main {
   font-weight: 700;
 }
 
+.place-filter-favorite {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.place-filter-favorite.is-active {
+  background: oklch(0.95 0.14 95 / 40%);
+  border-color: #eab308;
+  color: #eab308;
+  font-weight: 700;
+}
+
 .place-list,
 .expense-list {
   list-style: none;
@@ -922,6 +936,22 @@ main {
 .place-item-link:hover,
 .place-item-map-link:hover {
   text-decoration: underline;
+}
+
+.place-item-favorite {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--touch-target);
+  min-height: var(--touch-target);
+  border: none;
+  background: none;
+  color: var(--muted-foreground);
+  cursor: pointer;
+}
+
+.place-item-favorite.is-active {
+  color: #eab308;
 }
 
 .place-item-edit {
