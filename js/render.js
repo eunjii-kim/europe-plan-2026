@@ -692,12 +692,14 @@ export function renderBudgetList(listEl, items, rates, onDelete) {
 export const PLACE_FILTER_ALL = '전체';
 
 /**
- * "정보" 탭의 분류 필터 버튼(전체 + 분류별)을 렌더링한다.
+ * "정보" 탭의 분류 필터 버튼(전체 + 분류별)과 즐겨찾기 필터 토글을 렌더링한다.
  * @param {HTMLElement} containerEl
  * @param {string} activeCategory - PLACE_FILTER_ALL 또는 PLACE_CATEGORIES 중 하나
- * @param {(category: string) => void} onSelect
+ * @param {boolean} favoriteOnly - 즐겨찾기만 보기 필터 활성화 여부
+ * @param {(category: string) => void} onSelectCategory
+ * @param {() => void} onToggleFavorite
  */
-export function renderPlaceFilters(containerEl, activeCategory, onSelect) {
+export function renderPlaceFilters(containerEl, activeCategory, favoriteOnly, onSelectCategory, onToggleFavorite) {
   containerEl.innerHTML = '';
   const categories = [PLACE_FILTER_ALL, ...PLACE_CATEGORIES];
   for (const category of categories) {
@@ -707,9 +709,17 @@ export function renderPlaceFilters(containerEl, activeCategory, onSelect) {
     button.classList.toggle('is-active', category === activeCategory);
     const icon = category === PLACE_FILTER_ALL ? '' : `${PLACE_CATEGORY_ICONS[category]} `;
     button.textContent = `${icon}${category}`;
-    button.addEventListener('click', () => onSelect(category));
+    button.addEventListener('click', () => onSelectCategory(category));
     containerEl.appendChild(button);
   }
+
+  const favoriteButton = document.createElement('button');
+  favoriteButton.type = 'button';
+  favoriteButton.className = 'place-filter-button place-filter-favorite';
+  favoriteButton.classList.toggle('is-active', favoriteOnly);
+  favoriteButton.innerHTML = `${favoriteOnly ? ICONS.starFilled : ICONS.star} 즐겨찾기만 보기`;
+  favoriteButton.addEventListener('click', () => onToggleFavorite());
+  containerEl.appendChild(favoriteButton);
 }
 
 /**
@@ -756,12 +766,13 @@ function renderPlaceEditForm(item, regions, onSave) {
 /**
  * 조사한 장소(맛집/카페/쇼핑 등) 목록을 렌더링한다.
  * @param {HTMLElement} listEl
- * @param {Array<{ id: string, category: string, title: string, region: string, link: string, memo: string }>} items
+ * @param {Array<{ id: string, category: string, title: string, region: string, link: string, memo: string, favorite: boolean }>} items
  * @param {string[]} regions - 수정 폼의 지역 select에 채울 옵션 목록
  * @param {(id: string) => void} onDelete
  * @param {(id: string, values: object) => void} onEdit
+ * @param {(id: string, favorite: boolean) => void} onToggleFavorite
  */
-export function renderPlaceList(listEl, items, regions, onDelete, onEdit) {
+export function renderPlaceList(listEl, items, regions, onDelete, onEdit, onToggleFavorite) {
   listEl.innerHTML = '';
   if (items.length === 0) {
     const empty = document.createElement('li');
@@ -816,6 +827,15 @@ export function renderPlaceList(listEl, items, regions, onDelete, onEdit) {
       editForm.hidden = true;
     });
     editForm.hidden = true;
+
+    const favoriteButton = document.createElement('button');
+    favoriteButton.type = 'button';
+    favoriteButton.className = 'place-item-favorite';
+    favoriteButton.classList.toggle('is-active', !!item.favorite);
+    favoriteButton.innerHTML = item.favorite ? ICONS.starFilled : ICONS.star;
+    favoriteButton.setAttribute('aria-label', item.favorite ? '즐겨찾기 해제' : '즐겨찾기 추가');
+    favoriteButton.addEventListener('click', () => onToggleFavorite(item.id, !item.favorite));
+    li.appendChild(favoriteButton);
 
     const editButton = document.createElement('button');
     editButton.type = 'button';

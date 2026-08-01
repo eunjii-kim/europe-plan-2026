@@ -46,7 +46,7 @@ import {
   deleteScheduleCustomBlock,
   updateScheduleCustomBlockAttachments,
 } from './schedule.js';
-import { subscribeToPlaces, addPlace, deletePlace, updatePlace } from './places.js';
+import { subscribeToPlaces, addPlace, deletePlace, updatePlace, toggleFavoritePlace } from './places.js';
 import { subscribeToExpenses, addExpense, deleteExpense } from './expenses.js';
 import {
   subscribeToChecklistSections,
@@ -517,15 +517,28 @@ async function main() {
 
   let latestPlaces = [];
   let placeFilterCategory = PLACE_FILTER_ALL;
+  let placeFavoriteOnly = false;
   const renderPlacesTab = () => {
-    const filtered =
+    let filtered =
       placeFilterCategory === PLACE_FILTER_ALL
         ? latestPlaces
         : latestPlaces.filter((item) => item.category === placeFilterCategory);
-    renderPlaceFilters(document.getElementById('placeFilters'), placeFilterCategory, (category) => {
-      placeFilterCategory = category;
-      renderPlacesTab();
-    });
+    if (placeFavoriteOnly) {
+      filtered = filtered.filter((item) => item.favorite === true);
+    }
+    renderPlaceFilters(
+      document.getElementById('placeFilters'),
+      placeFilterCategory,
+      placeFavoriteOnly,
+      (category) => {
+        placeFilterCategory = category;
+        renderPlacesTab();
+      },
+      () => {
+        placeFavoriteOnly = !placeFavoriteOnly;
+        renderPlacesTab();
+      },
+    );
     renderPlaceList(
       document.getElementById('placeList'),
       filtered,
@@ -543,6 +556,14 @@ async function main() {
           await updatePlace(id, values);
         } catch (error) {
           console.error('장소 수정 실패', error);
+          showFirebaseNotice();
+        }
+      },
+      async (id, favorite) => {
+        try {
+          await toggleFavoritePlace(id, favorite);
+        } catch (error) {
+          console.error('장소 즐겨찾기 변경 실패', error);
           showFirebaseNotice();
         }
       },
