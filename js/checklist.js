@@ -34,11 +34,13 @@ export function subscribeToChecklistSections(onChange, onError) {
 /**
  * 새 섹션을 추가한다.
  * @param {string} title
+ * @param {number} order - 섹션 정렬 순서 (신규 섹션은 보통 현재 섹션 개수)
  * @returns {Promise<void>}
  */
-export async function addChecklistSection(title) {
+export async function addChecklistSection(title, order) {
   await addDoc(checklistSectionsCollection, {
     title,
+    order,
     createdAt: serverTimestamp(),
   });
 }
@@ -51,6 +53,16 @@ export async function addChecklistSection(title) {
  */
 export async function deleteChecklistSection(sectionId) {
   await deleteDoc(doc(checklistSectionsCollection, sectionId));
+}
+
+/**
+ * 섹션 정보(제목, 순서 등)를 수정한다.
+ * @param {string} sectionId
+ * @param {{ title?: string, order?: number }} values
+ * @returns {Promise<void>}
+ */
+export async function updateChecklistSection(sectionId, values) {
+  await updateDoc(doc(checklistSectionsCollection, sectionId), values);
 }
 
 /**
@@ -117,4 +129,14 @@ export async function toggleChecklistItem(itemId, checked) {
  */
 export async function updateChecklistItemMemo(itemId, memo) {
   await updateDoc(doc(checklistItemsCollection, itemId), { memo });
+}
+
+/**
+ * 준비물의 이름을 수정한다.
+ * @param {string} itemId
+ * @param {string} title
+ * @returns {Promise<void>}
+ */
+export async function updateChecklistItemTitle(itemId, title) {
+  await updateDoc(doc(checklistItemsCollection, itemId), { title });
 }
