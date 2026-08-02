@@ -939,6 +939,7 @@ main {
   max-height: 2.8em;
   overflow-y: auto;
   scrollbar-width: none;
+  white-space: pre-line;
 }
 
 .place-item-memo::-webkit-scrollbar {
