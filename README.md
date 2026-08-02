@@ -11,7 +11,7 @@
 - 편집모드(🔧)에서 일정 시간/제목/메모를 직접 수정하거나 새 일정을 추가/삭제 가능 (기기 간 실시간 공유)
 - 편집모드에서 일정 더보기에 이미지/링크 URL 첨부 가능
 - 추가 필요 예산 입력 (기기 간 실시간 공유)
-- 정보 탭: 조사한 맛집/카페/쇼핑 정보를 분류·지역과 함께 저장, 분류별로 필터링 (기기 간 실시간 공유)
+- 정보 탭: 조사한 맛집/카페/쇼핑 정보를 분류·지역과 함께 저장, 분류별로 필터링, 분류 직접 추가 가능, 즐겨찾기, 카드를 길게 누르면 수정/삭제 (기기 간 실시간 공유)
 - 소비기록 탭: 실제 지출을 날짜/분류/지역과 함께 기록, 총액·카테고리별·국가별·지역별 통계와 예정 비용 대비 잔액 확인 (기기 간 실시간 공유)
 - 체크리스트 탭: 섹션별로 준비물을 추가하고 체크박스/메모로 관리 (기기 간 실시간 공유)
 - 라이트/다크 모드 토글
@@ -38,10 +38,11 @@ python3 -m http.server 8000
 - `trips/europe-plan-2026/places` — 정보 탭에서 추가한 맛집/카페/쇼핑 정보
 - `trips/europe-plan-2026/expenses` — 소비기록 탭에서 추가한 지출 기록
 - `trips/europe-plan-2026/customRegions` — 정보/소비기록 탭의 지역 select에서 "+ 새 지역 추가"로 등록한 지역/도시
+- `trips/europe-plan-2026/customPlaceCategories` — 정보 탭의 분류 select에서 "+ 새 분류 추가"로 등록한 분류
 - `trips/europe-plan-2026/checklistSections` — 체크리스트 탭의 섹션(예: 의류, 전자기기)
 - `trips/europe-plan-2026/checklistItems` — 섹션별 준비물(체크 여부/메모 포함)
 
-> ⚠️ **아래 규칙은 코드로 자동 적용되지 않습니다.** `customRegions`/`checklistSections`/`checklistItems`를 새로 추가했다면, Firebase 콘솔 → Firestore Database → 규칙 탭에서 아래 내용을 직접 붙여넣고 게시해야 지역 추가/체크리스트 탭 기능이 정상 동작합니다. 게시 전까지는 저장을 시도하면 실패 안내 배너가 표시됩니다.
+> ⚠️ **아래 규칙은 코드로 자동 적용되지 않습니다.** `customRegions`/`customPlaceCategories`/`checklistSections`/`checklistItems`를 새로 추가했다면, Firebase 콘솔 → Firestore Database → 규칙 탭에서 아래 내용을 직접 붙여넣고 게시해야 지역/분류 추가·체크리스트 탭 기능이 정상 동작합니다. 게시 전까지는 저장을 시도하면 실패 안내 배너가 표시됩니다.
 
 ```
 rules_version = '2';
@@ -93,7 +94,9 @@ service cloud.firestore {
     }
     match /trips/europe-plan-2026/places/{placeId} {
       allow read: if true;
-      allow create, update: if request.resource.data.category in ['맛집', '카페', '쇼핑', '기타']
+      allow create, update: if request.resource.data.category is string
+                    && request.resource.data.category.size() >= 1
+                    && request.resource.data.category.size() <= 20
                     && request.resource.data.title is string
                     && request.resource.data.title.size() <= 100
                     && request.resource.data.region is string
@@ -128,6 +131,13 @@ service cloud.firestore {
       allow create: if request.resource.data.name is string
                     && request.resource.data.name.size() >= 1
                     && request.resource.data.name.size() <= 50;
+      allow update, delete: if false;
+    }
+    match /trips/europe-plan-2026/customPlaceCategories/{categoryId} {
+      allow read: if true;
+      allow create: if request.resource.data.name is string
+                    && request.resource.data.name.size() >= 1
+                    && request.resource.data.name.size() <= 20;
       allow update, delete: if false;
     }
     match /trips/europe-plan-2026/checklistSections/{sectionId} {

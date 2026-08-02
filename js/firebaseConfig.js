@@ -43,6 +43,9 @@ export const expensesCollection = collection(db, 'trips', TRIP_ID, 'expenses');
 /** trips/{TRIP_ID}/customRegions 서브컬렉션 참조 (사용자가 추가한 지역/도시) */
 export const customRegionsCollection = collection(db, 'trips', TRIP_ID, 'customRegions');
 
+/** trips/{TRIP_ID}/customPlaceCategories 서브컬렉션 참조 (사용자가 추가한 장소 분류) */
+export const customPlaceCategoriesCollection = collection(db, 'trips', TRIP_ID, 'customPlaceCategories');
+
 /** trips/{TRIP_ID}/checklistSections 서브컬렉션 참조 (체크리스트 섹션) */
 export const checklistSectionsCollection = collection(db, 'trips', TRIP_ID, 'checklistSections');
 

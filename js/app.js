@@ -7,6 +7,10 @@ import {
   ICONS,
   EXCLUDED_REGIONS,
   ADD_NEW_REGION_VALUE,
+  ADD_NEW_CATEGORY_VALUE,
+  PLACE_CATEGORIES,
+  PLACE_CATEGORY_ICONS,
+  DEFAULT_PLACE_CATEGORY_ICON,
 } from './constants.js';
 import { getExchangeRates } from './exchangeRate.js';
 import {
@@ -61,6 +65,7 @@ import {
   updateChecklistItemTitle,
 } from './checklist.js';
 import { subscribeToCustomRegions, addCustomRegion } from './customRegions.js';
+import { subscribeToCustomPlaceCategories, addCustomPlaceCategory } from './customPlaceCategories.js';
 import { isFirebaseConfigured } from './firebaseConfig.js';
 
 /**
@@ -150,47 +155,51 @@ function setupEditModeToggle(onToggle) {
 }
 
 /**
- * select 요소에 지역 옵션 목록을 채운다. 첫 옵션은 "지역 선택 안함", 마지막은 "+ 새 지역 추가"이다.
- * 호출할 때마다 기존 옵션을 지우고 다시 채운다(사용자가 추가한 지역이 실시간으로 반영되므로).
+ * select 요소에 옵션 목록 + "+ 새 항목 추가" 옵션을 채우는 공용 헬퍼.
+ * 호출할 때마다 기존 옵션을 지우고 다시 채운다(사용자가 추가한 항목이 실시간으로 반영되므로).
  * @param {HTMLSelectElement} selectEl
- * @param {string[]} regions
+ * @param {string[]} values
+ * @param {{ emptyOptionLabel?: string, addNewOptionValue: string, addNewOptionLabel: string, renderOptionLabel?: (value: string) => string }} opts
  */
-function populateRegionSelect(selectEl, regions) {
+function populateSelectWithAddOption(selectEl, values, opts) {
   selectEl.innerHTML = '';
 
-  const emptyOption = document.createElement('option');
-  emptyOption.value = '';
-  emptyOption.textContent = '지역 선택 안함';
-  selectEl.appendChild(emptyOption);
+  if (opts.emptyOptionLabel) {
+    const emptyOption = document.createElement('option');
+    emptyOption.value = '';
+    emptyOption.textContent = opts.emptyOptionLabel;
+    selectEl.appendChild(emptyOption);
+  }
 
-  for (const region of regions) {
+  for (const value of values) {
     const option = document.createElement('option');
-    option.value = region;
-    option.textContent = region;
+    option.value = value;
+    option.textContent = opts.renderOptionLabel ? opts.renderOptionLabel(value) : value;
     selectEl.appendChild(option);
   }
 
   const addNewOption = document.createElement('option');
-  addNewOption.value = ADD_NEW_REGION_VALUE;
-  addNewOption.textContent = '+ 새 지역 추가';
+  addNewOption.value = opts.addNewOptionValue;
+  addNewOption.textContent = opts.addNewOptionLabel;
   selectEl.appendChild(addNewOption);
 }
 
 /**
- * 지역 select에서 "+ 새 지역 추가"를 골랐을 때 이름을 입력받아 Firestore에 저장한다.
+ * select에서 "+ 새 항목 추가"를 골랐을 때 이름을 입력받아 Firestore에 저장하는 공용 헬퍼.
  * 취소하거나 빈 값이면 이전 선택값으로 되돌린다.
  * @param {HTMLSelectElement} selectEl
+ * @param {{ addNewOptionValue: string, promptMessage: string }} opts
  * @param {(selectEl: HTMLSelectElement, name: string) => void} onAdd
  */
-function setupRegionAddOption(selectEl, onAdd) {
+function setupAddOption(selectEl, opts, onAdd) {
   selectEl.dataset.previousValue = selectEl.value;
   selectEl.addEventListener('change', async () => {
-    if (selectEl.value !== ADD_NEW_REGION_VALUE) {
+    if (selectEl.value !== opts.addNewOptionValue) {
       selectEl.dataset.previousValue = selectEl.value;
       return;
     }
     const previousValue = selectEl.dataset.previousValue || '';
-    const name = (window.prompt('추가할 지역/도시 이름을 입력하세요') || '').trim();
+    const name = (window.prompt(opts.promptMessage) || '').trim();
     if (!name) {
       selectEl.value = previousValue;
       return;
@@ -198,11 +207,55 @@ function setupRegionAddOption(selectEl, onAdd) {
     try {
       await onAdd(selectEl, name);
     } catch (error) {
-      console.error('지역 추가 실패', error);
+      console.error('항목 추가 실패', error);
       showFirebaseNotice();
       selectEl.value = previousValue;
     }
   });
+}
+
+/**
+ * select 요소에 지역 옵션 목록을 채운다. 첫 옵션은 "지역 선택 안함", 마지막은 "+ 새 지역 추가"이다.
+ * @param {HTMLSelectElement} selectEl
+ * @param {string[]} regions
+ */
+function populateRegionSelect(selectEl, regions) {
+  populateSelectWithAddOption(selectEl, regions, {
+    emptyOptionLabel: '지역 선택 안함',
+    addNewOptionValue: ADD_NEW_REGION_VALUE,
+    addNewOptionLabel: '+ 새 지역 추가',
+  });
+}
+
+/**
+ * 지역 select에서 "+ 새 지역 추가"를 골랐을 때 이름을 입력받아 Firestore에 저장한다.
+ * @param {HTMLSelectElement} selectEl
+ * @param {(selectEl: HTMLSelectElement, name: string) => void} onAdd
+ */
+function setupRegionAddOption(selectEl, onAdd) {
+  setupAddOption(selectEl, { addNewOptionValue: ADD_NEW_REGION_VALUE, promptMessage: '추가할 지역/도시 이름을 입력하세요' }, onAdd);
+}
+
+/**
+ * select 요소에 분류 옵션 목록을 채운다. 마지막은 "+ 새 분류 추가"이다.
+ * @param {HTMLSelectElement} selectEl
+ * @param {string[]} categories
+ */
+function populateCategorySelect(selectEl, categories) {
+  populateSelectWithAddOption(selectEl, categories, {
+    addNewOptionValue: ADD_NEW_CATEGORY_VALUE,
+    addNewOptionLabel: '+ 새 분류 추가',
+    renderOptionLabel: (category) => `${PLACE_CATEGORY_ICONS[category] || DEFAULT_PLACE_CATEGORY_ICON} ${category}`,
+  });
+}
+
+/**
+ * 분류 select에서 "+ 새 분류 추가"를 골랐을 때 이름을 입력받아 Firestore에 저장한다.
+ * @param {HTMLSelectElement} selectEl
+ * @param {(selectEl: HTMLSelectElement, name: string) => void} onAdd
+ */
+function setupCategoryAddOption(selectEl, onAdd) {
+  setupAddOption(selectEl, { addNewOptionValue: ADD_NEW_CATEGORY_VALUE, promptMessage: '추가할 분류 이름을 입력하세요 (예: 야경 명소)' }, onAdd);
 }
 
 /**
@@ -410,6 +463,33 @@ async function main() {
   setupRegionAddOption(placeRegionInput, onAddRegion);
   setupRegionAddOption(expenseRegionInput, onAddRegion);
 
+  const placeCategoryInput = document.getElementById('placeCategoryInput');
+  let latestCustomPlaceCategories = [];
+  let pendingCategorySelection = null;
+  const refreshCategorySelects = () => {
+    const categories = [...PLACE_CATEGORIES, ...latestCustomPlaceCategories.map((c) => c.name)];
+    const previousValue = placeCategoryInput.dataset.previousValue || '';
+    populateCategorySelect(placeCategoryInput, categories);
+    const nextValue = pendingCategorySelection ? pendingCategorySelection.name : previousValue;
+    if ([...placeCategoryInput.options].some((option) => option.value === nextValue)) {
+      placeCategoryInput.value = nextValue;
+    }
+    placeCategoryInput.dataset.previousValue = placeCategoryInput.value;
+    pendingCategorySelection = null;
+  };
+  refreshCategorySelects();
+
+  const onAddCategory = async (selectEl, name) => {
+    pendingCategorySelection = { name };
+    try {
+      await addCustomPlaceCategory(name);
+    } catch (error) {
+      pendingCategorySelection = null;
+      throw error;
+    }
+  };
+  setupCategoryAddOption(placeCategoryInput, onAddCategory);
+
   const expenseDateInput = document.getElementById('expenseDateInput');
   expenseDateInput.min = TRIP_INFO.startDate;
   expenseDateInput.max = TRIP_INFO.endDate;
@@ -524,6 +604,7 @@ async function main() {
   let placeFilterCategory = PLACE_FILTER_ALL;
   let placeFavoriteOnly = false;
   const renderPlacesTab = () => {
+    const allPlaceCategories = [...PLACE_CATEGORIES, ...latestCustomPlaceCategories.map((c) => c.name)];
     let filtered =
       placeFilterCategory === PLACE_FILTER_ALL
         ? latestPlaces
@@ -533,6 +614,7 @@ async function main() {
     }
     renderPlaceFilters(
       document.getElementById('placeFilters'),
+      allPlaceCategories,
       placeFilterCategory,
       placeFavoriteOnly,
       (category) => {
@@ -547,6 +629,7 @@ async function main() {
     renderPlaceList(
       document.getElementById('placeList'),
       filtered,
+      allPlaceCategories,
       [...tripRegions, ...latestCustomRegions.map((r) => r.name)],
       async (id) => {
         try {
@@ -807,6 +890,11 @@ async function main() {
     subscribeToCustomRegions((regions) => {
       latestCustomRegions = regions;
       refreshRegionSelects();
+      renderPlacesTab();
+    }, () => showFirebaseNotice());
+    subscribeToCustomPlaceCategories((categories) => {
+      latestCustomPlaceCategories = categories;
+      refreshCategorySelects();
       renderPlacesTab();
     }, () => showFirebaseNotice());
   }

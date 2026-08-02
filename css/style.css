@@ -894,6 +894,7 @@ main {
 }
 
 .place-list-item {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -901,6 +902,8 @@ main {
   padding: var(--spacing-2);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
+  -webkit-touch-callout: none;
+  user-select: none;
 }
 
 .place-item-main {
@@ -932,6 +935,14 @@ main {
   margin: 0;
   color: var(--muted-foreground);
   font-size: 0.85rem;
+  line-height: 1.4;
+  max-height: 2.8em;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.place-item-memo::-webkit-scrollbar {
+  display: none;
 }
 
 .place-item-link,
@@ -962,31 +973,35 @@ main {
   color: #eab308;
 }
 
-.place-item-edit {
-  display: inline-flex;
+.place-item-actions {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  background: var(--card);
+  border-radius: var(--radius-sm);
+}
+
+.place-item-action-edit,
+.place-item-action-delete {
+  flex: 1 1 50%;
+  display: flex;
   align-items: center;
   justify-content: center;
-  min-width: var(--touch-target);
-  min-height: var(--touch-target);
-  margin-left: auto;
+  gap: var(--spacing-1);
   border: none;
   background: none;
-  color: var(--muted-foreground);
+  font-size: 0.95rem;
+  font-family: var(--font-sans);
   cursor: pointer;
 }
 
-.place-item-delete {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: var(--touch-target);
-  min-height: var(--touch-target);
-  margin-left: auto;
-  align-self: center;
-  border: none;
-  background: none;
+.place-item-action-edit {
+  color: var(--primary);
+  border-right: 1px solid var(--border);
+}
+
+.place-item-action-delete {
   color: var(--danger);
-  cursor: pointer;
 }
 
 .place-edit-form {

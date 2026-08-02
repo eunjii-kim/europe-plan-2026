@@ -94,6 +94,9 @@ export const EXCLUDED_REGIONS = new Set(['남부투어', '자유일정', '로마
 /** 지역 select 맨 아래 "+ 새 지역 추가" 옵션에 쓰는 sentinel value */
 export const ADD_NEW_REGION_VALUE = '__add_new_region__';
 
+/** 분류 select 맨 아래 "+ 새 분류 추가" 옵션에 쓰는 sentinel value */
+export const ADD_NEW_CATEGORY_VALUE = '__add_new_category__';
+
 /** localStorage에 라이트/다크 테마 선택값을 저장할 때 쓰는 키 */
 export const THEME_STORAGE_KEY = 'europePlan2026:theme';
 

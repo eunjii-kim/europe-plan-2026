@@ -3,7 +3,6 @@ import {
   DEFAULT_CATEGORY_ICON,
   SWISS_REGIONS,
   ICONS,
-  PLACE_CATEGORIES,
   PLACE_CATEGORY_ICONS,
   DEFAULT_PLACE_CATEGORY_ICON,
   EXPENSE_CATEGORIES,
@@ -693,22 +692,43 @@ export function renderBudgetList(listEl, items, rates, onDelete) {
 export const PLACE_FILTER_ALL = '전체';
 
 /**
+ * 정보 탭 카드에서 long-press로 열린 편집/삭제 메뉴 상태. 한 번에 하나만 열려있을 수 있다.
+ * @type {{ li: HTMLElement, contentEls: HTMLElement[], actionsEl: HTMLElement } | null}
+ */
+let openPlaceActionsMenu = null;
+
+function closePlaceActionsMenu() {
+  if (!openPlaceActionsMenu) return;
+  const { contentEls, actionsEl } = openPlaceActionsMenu;
+  actionsEl.hidden = true;
+  for (const el of contentEls) el.hidden = false;
+  openPlaceActionsMenu = null;
+}
+
+document.addEventListener('click', (event) => {
+  if (!openPlaceActionsMenu) return;
+  if (openPlaceActionsMenu.li.contains(event.target)) return;
+  closePlaceActionsMenu();
+});
+
+/**
  * "정보" 탭의 분류 필터 버튼(전체 + 분류별)과 즐겨찾기 필터 토글을 렌더링한다.
  * @param {HTMLElement} containerEl
- * @param {string} activeCategory - PLACE_FILTER_ALL 또는 PLACE_CATEGORIES 중 하나
+ * @param {string[]} categories - 고정 분류 + 사용자가 추가한 커스텀 분류 병합 목록
+ * @param {string} activeCategory - PLACE_FILTER_ALL 또는 categories 중 하나
  * @param {boolean} favoriteOnly - 즐겨찾기만 보기 필터 활성화 여부
  * @param {(category: string) => void} onSelectCategory
  * @param {() => void} onToggleFavorite
  */
-export function renderPlaceFilters(containerEl, activeCategory, favoriteOnly, onSelectCategory, onToggleFavorite) {
+export function renderPlaceFilters(containerEl, categories, activeCategory, favoriteOnly, onSelectCategory, onToggleFavorite) {
   containerEl.innerHTML = '';
-  const categories = [PLACE_FILTER_ALL, ...PLACE_CATEGORIES];
-  for (const category of categories) {
+  const allCategories = [PLACE_FILTER_ALL, ...categories];
+  for (const category of allCategories) {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'place-filter-button';
     button.classList.toggle('is-active', category === activeCategory);
-    const icon = category === PLACE_FILTER_ALL ? '' : `${PLACE_CATEGORY_ICONS[category]} `;
+    const icon = category === PLACE_FILTER_ALL ? '' : `${PLACE_CATEGORY_ICONS[category] || DEFAULT_PLACE_CATEGORY_ICON} `;
     button.textContent = `${icon}${category}`;
     button.addEventListener('click', () => onSelectCategory(category));
     containerEl.appendChild(button);
@@ -726,15 +746,20 @@ export function renderPlaceFilters(containerEl, activeCategory, favoriteOnly, on
 /**
  * 저장된 장소 정보를 수정하는 인라인 폼을 만든다.
  * @param {{ category: string, title: string, region: string, link: string, memo: string }} item
+ * @param {string[]} categories - 고정 분류 + 사용자가 추가한 커스텀 분류 병합 목록
  * @param {string[]} regions - 지역 select에 채울 옵션 목록
  * @param {(values: { category: string, title: string, region: string, link: string, memo: string }) => void} onSave
  * @returns {HTMLFormElement}
  */
-function renderPlaceEditForm(item, regions, onSave) {
+function renderPlaceEditForm(item, categories, regions, onSave) {
   const form = document.createElement('form');
   form.className = 'place-edit-form';
-  const categoryOptions = PLACE_CATEGORIES
-    .map((category) => `<option value="${category}" ${category === item.category ? 'selected' : ''}>${PLACE_CATEGORY_ICONS[category]} ${category}</option>`)
+  const categoryOptions = categories
+    .map((category) => {
+      const icon = PLACE_CATEGORY_ICONS[category] || DEFAULT_PLACE_CATEGORY_ICON;
+      const safeCategory = escapeHtml(category);
+      return `<option value="${safeCategory}" ${category === item.category ? 'selected' : ''}>${icon} ${safeCategory}</option>`;
+    })
     .join('');
   const regionOptions = regions
     .map((region) => `<option value="${escapeHtml(region)}" ${region === item.region ? 'selected' : ''}>${escapeHtml(region)}</option>`)
@@ -768,13 +793,15 @@ function renderPlaceEditForm(item, regions, onSave) {
  * 조사한 장소(맛집/카페/쇼핑 등) 목록을 렌더링한다.
  * @param {HTMLElement} listEl
  * @param {Array<{ id: string, category: string, title: string, region: string, link: string, memo: string, favorite: boolean }>} items
+ * @param {string[]} categories - 고정 분류 + 사용자가 추가한 커스텀 분류 병합 목록
  * @param {string[]} regions - 수정 폼의 지역 select에 채울 옵션 목록
  * @param {(id: string) => void} onDelete
  * @param {(id: string, values: object) => void} onEdit
  * @param {(id: string, favorite: boolean) => void} onToggleFavorite
  */
-export function renderPlaceList(listEl, items, regions, onDelete, onEdit, onToggleFavorite) {
+export function renderPlaceList(listEl, items, categories, regions, onDelete, onEdit, onToggleFavorite) {
   listEl.innerHTML = '';
+  closePlaceActionsMenu();
   if (items.length === 0) {
     const empty = document.createElement('li');
     empty.className = 'place-list-empty';
@@ -787,6 +814,7 @@ export function renderPlaceList(listEl, items, regions, onDelete, onEdit, onTogg
     li.className = 'place-list-item';
     const icon = PLACE_CATEGORY_ICONS[item.category] || DEFAULT_PLACE_CATEGORY_ICON;
     const regionTag = item.region ? `<span class="place-item-region">📍 ${escapeHtml(item.region)}</span>` : '';
+    const contentEls = [];
 
     const main = document.createElement('div');
     main.className = 'place-item-main';
@@ -795,25 +823,15 @@ export function renderPlaceList(listEl, items, regions, onDelete, onEdit, onTogg
       <span class="place-item-title">${escapeHtml(item.title)}</span>
       ${regionTag}
     `;
-
-    const deleteButton = document.createElement('button');
-    deleteButton.type = 'button';
-    deleteButton.className = 'place-item-delete';
-    deleteButton.innerHTML = ICONS.x;
-    deleteButton.setAttribute('aria-label', '삭제');
-    deleteButton.addEventListener('click', () => {
-      if (!window.confirm(`"${item.title}" 항목을 삭제할까요?`)) return;
-      onDelete(item.id);
-    });
-    main.appendChild(deleteButton);
-
     li.appendChild(main);
+    contentEls.push(main);
 
     if (item.memo) {
       const memo = document.createElement('p');
       memo.className = 'place-item-memo';
       memo.textContent = item.memo;
       li.appendChild(memo);
+      contentEls.push(memo);
     }
 
     if (item.link) {
@@ -824,6 +842,7 @@ export function renderPlaceList(listEl, items, regions, onDelete, onEdit, onTogg
       link.rel = 'noopener noreferrer';
       link.textContent = `🔗 ${safeHostname(item.link)}`;
       li.appendChild(link);
+      contentEls.push(link);
     }
 
     const mapQuery = [item.title, item.region].filter(Boolean).join(' ');
@@ -834,8 +853,9 @@ export function renderPlaceList(listEl, items, regions, onDelete, onEdit, onTogg
     mapLink.rel = 'noopener noreferrer';
     mapLink.textContent = '🗺️ 지도에서 보기';
     li.appendChild(mapLink);
+    contentEls.push(mapLink);
 
-    const editForm = renderPlaceEditForm(item, regions, (values) => {
+    const editForm = renderPlaceEditForm(item, categories, regions, (values) => {
       onEdit(item.id, values);
       editForm.hidden = true;
     });
@@ -849,18 +869,62 @@ export function renderPlaceList(listEl, items, regions, onDelete, onEdit, onTogg
     favoriteButton.setAttribute('aria-label', item.favorite ? '즐겨찾기 해제' : '즐겨찾기 추가');
     favoriteButton.addEventListener('click', () => onToggleFavorite(item.id, !item.favorite));
     li.appendChild(favoriteButton);
+    contentEls.push(favoriteButton);
 
-    const editButton = document.createElement('button');
-    editButton.type = 'button';
-    editButton.className = 'place-item-edit';
-    editButton.innerHTML = ICONS.pencil;
-    editButton.setAttribute('aria-label', '수정');
-    editButton.addEventListener('click', () => {
-      editForm.hidden = !editForm.hidden;
+    const actionsEl = document.createElement('div');
+    actionsEl.className = 'place-item-actions';
+    actionsEl.hidden = true;
+
+    const editActionButton = document.createElement('button');
+    editActionButton.type = 'button';
+    editActionButton.className = 'place-item-action-edit';
+    editActionButton.innerHTML = `${ICONS.pencil} 수정`;
+    editActionButton.addEventListener('click', () => {
+      closePlaceActionsMenu();
+      editForm.hidden = false;
     });
-    li.appendChild(editButton);
 
+    const deleteActionButton = document.createElement('button');
+    deleteActionButton.type = 'button';
+    deleteActionButton.className = 'place-item-action-delete';
+    deleteActionButton.innerHTML = `${ICONS.trash} 삭제`;
+    deleteActionButton.addEventListener('click', () => {
+      closePlaceActionsMenu();
+      if (!window.confirm(`"${item.title}" 항목을 삭제할까요?`)) return;
+      onDelete(item.id);
+    });
+
+    actionsEl.append(editActionButton, deleteActionButton);
+    li.appendChild(actionsEl);
     li.appendChild(editForm);
+
+    const LONG_PRESS_MS = 500;
+    let longPressTimer = null;
+    const isInteractiveTarget = (target) => !!target.closest('a, button, input, textarea, select');
+
+    const startLongPress = (event) => {
+      if (isInteractiveTarget(event.target)) return;
+      clearTimeout(longPressTimer);
+      longPressTimer = setTimeout(() => {
+        closePlaceActionsMenu();
+        for (const el of contentEls) el.hidden = true;
+        actionsEl.hidden = false;
+        openPlaceActionsMenu = { li, contentEls, actionsEl };
+      }, LONG_PRESS_MS);
+    };
+    const cancelLongPress = () => {
+      clearTimeout(longPressTimer);
+      longPressTimer = null;
+    };
+
+    li.addEventListener('mousedown', startLongPress);
+    li.addEventListener('mouseup', cancelLongPress);
+    li.addEventListener('mouseleave', cancelLongPress);
+    li.addEventListener('touchstart', startLongPress, { passive: true });
+    li.addEventListener('touchmove', cancelLongPress);
+    li.addEventListener('touchend', cancelLongPress);
+    li.addEventListener('touchcancel', cancelLongPress);
+    li.addEventListener('contextmenu', (event) => event.preventDefault());
 
     listEl.appendChild(li);
   }
