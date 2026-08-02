@@ -710,6 +710,106 @@ document.addEventListener('click', (event) => {
 });
 
 /**
+ * 정보 탭 카드를 클릭했을 때 장소 정보를 화면 중앙에 확대해서 보여주는 모달의 DOM(지연 생성 싱글턴).
+ * @type {{ modal: HTMLElement, category: HTMLElement, favorite: HTMLElement, title: HTMLElement, region: HTMLElement, memo: HTMLElement, link: HTMLAnchorElement, mapLink: HTMLAnchorElement } | null}
+ */
+let placeDetailModalRefs = null;
+
+function closePlaceDetailModal() {
+  if (!placeDetailModalRefs) return;
+  placeDetailModalRefs.modal.hidden = true;
+}
+
+function ensurePlaceDetailModal() {
+  if (placeDetailModalRefs) return placeDetailModalRefs;
+
+  const modal = document.createElement('div');
+  modal.className = 'place-detail-modal';
+  modal.hidden = true;
+
+  const backdrop = document.createElement('div');
+  backdrop.className = 'place-detail-backdrop';
+  backdrop.addEventListener('click', closePlaceDetailModal);
+
+  const card = document.createElement('div');
+  card.className = 'place-detail-card';
+  card.setAttribute('role', 'dialog');
+  card.setAttribute('aria-modal', 'true');
+
+  const closeButton = document.createElement('button');
+  closeButton.type = 'button';
+  closeButton.className = 'place-detail-close';
+  closeButton.innerHTML = ICONS.x;
+  closeButton.setAttribute('aria-label', '닫기');
+  closeButton.addEventListener('click', closePlaceDetailModal);
+
+  const header = document.createElement('div');
+  header.className = 'place-detail-header';
+  const category = document.createElement('span');
+  category.className = 'place-detail-category';
+  const favorite = document.createElement('span');
+  favorite.className = 'place-detail-favorite';
+  header.append(category, favorite);
+
+  const title = document.createElement('h3');
+  title.className = 'place-detail-title';
+
+  const region = document.createElement('span');
+  region.className = 'place-detail-region';
+
+  const memo = document.createElement('p');
+  memo.className = 'place-detail-memo';
+
+  const link = document.createElement('a');
+  link.className = 'place-detail-link';
+  link.target = '_blank';
+  link.rel = 'noopener noreferrer';
+
+  const mapLink = document.createElement('a');
+  mapLink.className = 'place-detail-map-link';
+  mapLink.target = '_blank';
+  mapLink.rel = 'noopener noreferrer';
+  mapLink.textContent = '🗺️ 지도에서 보기';
+
+  card.append(closeButton, header, title, region, memo, link, mapLink);
+  modal.append(backdrop, card);
+  document.body.appendChild(modal);
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') closePlaceDetailModal();
+  });
+
+  placeDetailModalRefs = { modal, category, favorite, title, region, memo, link, mapLink };
+  return placeDetailModalRefs;
+}
+
+/**
+ * 정보 탭 카드 클릭 시 장소 정보를 화면 중앙에 확대해서 보여준다.
+ * @param {{ category: string, title: string, region: string, link: string, memo: string, favorite: boolean }} item
+ */
+function openPlaceDetailModal(item) {
+  const refs = ensurePlaceDetailModal();
+  const icon = PLACE_CATEGORY_ICONS[item.category] || DEFAULT_PLACE_CATEGORY_ICON;
+  refs.category.textContent = `${icon} ${item.category}`;
+  refs.favorite.innerHTML = item.favorite ? ICONS.starFilled : '';
+  refs.title.textContent = item.title;
+  refs.region.textContent = item.region ? `📍 ${item.region}` : '';
+  refs.region.hidden = !item.region;
+  refs.memo.textContent = item.memo || '';
+  refs.memo.hidden = !item.memo;
+  if (item.link) {
+    refs.link.href = item.link;
+    refs.link.textContent = `🔗 ${safeHostname(item.link)}`;
+    refs.link.hidden = false;
+  } else {
+    refs.link.hidden = true;
+  }
+  const mapQuery = [item.title, item.region].filter(Boolean).join(' ');
+  refs.mapLink.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapQuery)}`;
+  refs.modal.hidden = false;
+}
+
+/**
  * "정보" 탭의 분류 필터 버튼(전체 + 분류별)과 즐겨찾기 필터 토글을 렌더링한다.
  * @param {HTMLElement} containerEl
  * @param {string[]} categories - 고정 분류 + 사용자가 추가한 커스텀 분류 병합 목록
@@ -800,6 +900,7 @@ function renderPlaceEditForm(item, categories, regions, onSave) {
 export function renderPlaceList(listEl, items, categories, regions, onDelete, onEdit, onToggleFavorite) {
   listEl.innerHTML = '';
   closePlaceActionsMenu();
+  closePlaceDetailModal();
   if (items.length === 0) {
     const empty = document.createElement('li');
     empty.className = 'place-list-empty';
@@ -916,6 +1017,12 @@ export function renderPlaceList(listEl, items, categories, regions, onDelete, on
     li.addEventListener('touchend', cancelLongPress);
     li.addEventListener('touchcancel', cancelLongPress);
     li.addEventListener('contextmenu', (event) => event.preventDefault());
+
+    li.addEventListener('click', (event) => {
+      if (isInteractiveTarget(event.target)) return;
+      if (!actionsEl.hidden || !editForm.hidden) return;
+      openPlaceDetailModal(item);
+    });
 
     listEl.appendChild(li);
   }
