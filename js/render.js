@@ -693,15 +693,13 @@ export const PLACE_FILTER_ALL = '전체';
 
 /**
  * 정보 탭 카드에서 long-press로 열린 편집/삭제 메뉴 상태. 한 번에 하나만 열려있을 수 있다.
- * @type {{ li: HTMLElement, contentEls: HTMLElement[], actionsEl: HTMLElement } | null}
+ * @type {{ li: HTMLElement, actionsEl: HTMLElement } | null}
  */
 let openPlaceActionsMenu = null;
 
 function closePlaceActionsMenu() {
   if (!openPlaceActionsMenu) return;
-  const { contentEls, actionsEl } = openPlaceActionsMenu;
-  actionsEl.hidden = true;
-  for (const el of contentEls) el.hidden = false;
+  openPlaceActionsMenu.actionsEl.hidden = true;
   openPlaceActionsMenu = null;
 }
 
@@ -814,7 +812,6 @@ export function renderPlaceList(listEl, items, categories, regions, onDelete, on
     li.className = 'place-list-item';
     const icon = PLACE_CATEGORY_ICONS[item.category] || DEFAULT_PLACE_CATEGORY_ICON;
     const regionTag = item.region ? `<span class="place-item-region">📍 ${escapeHtml(item.region)}</span>` : '';
-    const contentEls = [];
 
     const main = document.createElement('div');
     main.className = 'place-item-main';
@@ -824,14 +821,12 @@ export function renderPlaceList(listEl, items, categories, regions, onDelete, on
       ${regionTag}
     `;
     li.appendChild(main);
-    contentEls.push(main);
 
     if (item.memo) {
       const memo = document.createElement('p');
       memo.className = 'place-item-memo';
       memo.textContent = item.memo;
       li.appendChild(memo);
-      contentEls.push(memo);
     }
 
     if (item.link) {
@@ -842,7 +837,6 @@ export function renderPlaceList(listEl, items, categories, regions, onDelete, on
       link.rel = 'noopener noreferrer';
       link.textContent = `🔗 ${safeHostname(item.link)}`;
       li.appendChild(link);
-      contentEls.push(link);
     }
 
     const mapQuery = [item.title, item.region].filter(Boolean).join(' ');
@@ -853,7 +847,6 @@ export function renderPlaceList(listEl, items, categories, regions, onDelete, on
     mapLink.rel = 'noopener noreferrer';
     mapLink.textContent = '🗺️ 지도에서 보기';
     li.appendChild(mapLink);
-    contentEls.push(mapLink);
 
     const editForm = renderPlaceEditForm(item, categories, regions, (values) => {
       onEdit(item.id, values);
@@ -869,7 +862,6 @@ export function renderPlaceList(listEl, items, categories, regions, onDelete, on
     favoriteButton.setAttribute('aria-label', item.favorite ? '즐겨찾기 해제' : '즐겨찾기 추가');
     favoriteButton.addEventListener('click', () => onToggleFavorite(item.id, !item.favorite));
     li.appendChild(favoriteButton);
-    contentEls.push(favoriteButton);
 
     const actionsEl = document.createElement('div');
     actionsEl.className = 'place-item-actions';
@@ -907,9 +899,8 @@ export function renderPlaceList(listEl, items, categories, regions, onDelete, on
       clearTimeout(longPressTimer);
       longPressTimer = setTimeout(() => {
         closePlaceActionsMenu();
-        for (const el of contentEls) el.hidden = true;
         actionsEl.hidden = false;
-        openPlaceActionsMenu = { li, contentEls, actionsEl };
+        openPlaceActionsMenu = { li, actionsEl };
       }, LONG_PRESS_MS);
     };
     const cancelLongPress = () => {

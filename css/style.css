@@ -977,12 +977,22 @@ main {
   position: absolute;
   inset: 0;
   display: flex;
-  background: var(--card);
   border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.place-item-actions::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--card);
+  opacity: 0.8;
 }
 
 .place-item-action-edit,
 .place-item-action-delete {
+  position: relative;
+  z-index: 1;
   flex: 1 1 50%;
   display: flex;
   align-items: center;
