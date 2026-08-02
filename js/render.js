@@ -1334,19 +1334,23 @@ function createChecklistSectionTitleEdit(section, onEditSectionTitle) {
  * @param {HTMLElement} listEl
  * @param {Array<{ id: string, title: string }>} sections - order 기준으로 이미 정렬된 배열
  * @param {Map<string, Array<{ id: string, title: string, checked: boolean, memo: string }>>} itemsBySectionId
+ * @param {Set<string>} editModeSectionIds - 편집모드 중인 섹션 id 집합
+ * @param {Set<string>} selectedItemIds - 편집모드에서 삭제 선택된 item id 집합
  * @param {{
  *   onDeleteSection: (sectionId: string) => void,
  *   onAddItem: (sectionId: string, title: string) => void,
- *   onDeleteItem: (itemId: string) => void,
  *   onToggleItem: (itemId: string, checked: boolean) => void,
  *   onMemoChange: (itemId: string, memo: string) => void,
  *   onEditSectionTitle: (sectionId: string, title: string) => void,
  *   onEditItemTitle: (itemId: string, title: string) => void,
  *   onMoveSectionUp: (sectionId: string) => void,
  *   onMoveSectionDown: (sectionId: string) => void,
+ *   onToggleSectionEditMode: (sectionId: string) => void,
+ *   onToggleItemSelected: (itemId: string) => void,
+ *   onDeleteSelectedItems: (sectionId: string) => void,
  * }} handlers
  */
-export function renderChecklistSections(listEl, sections, itemsBySectionId, handlers) {
+export function renderChecklistSections(listEl, sections, itemsBySectionId, editModeSectionIds, selectedItemIds, handlers) {
   listEl.innerHTML = '';
   if (sections.length === 0) {
     const empty = document.createElement('p');
@@ -1359,6 +1363,7 @@ export function renderChecklistSections(listEl, sections, itemsBySectionId, hand
   sections.forEach((section, index) => {
     const items = itemsBySectionId.get(section.id) || [];
     const checkedCount = items.filter((item) => item.checked).length;
+    const isEditMode = editModeSectionIds.has(section.id);
 
     const sectionEl = document.createElement('div');
     sectionEl.className = 'checklist-section';
@@ -1427,10 +1432,42 @@ export function renderChecklistSections(listEl, sections, itemsBySectionId, hand
     });
     actions.appendChild(deleteSectionButton);
 
+    const editModeToggleButton = document.createElement('button');
+    editModeToggleButton.type = 'button';
+    editModeToggleButton.className = 'checklist-section-edit-mode-toggle';
+    editModeToggleButton.textContent = isEditMode ? '완료' : '편집';
+    editModeToggleButton.addEventListener('click', () => handlers.onToggleSectionEditMode(section.id));
+    actions.appendChild(editModeToggleButton);
+
     header.appendChild(actions);
     sectionEl.appendChild(header);
     sectionEl.appendChild(sectionEditForm);
     sectionEl.appendChild(addItemForm);
+
+    if (isEditMode) {
+      const selectedCount = items.filter((item) => selectedItemIds.has(item.id)).length;
+
+      const editBar = document.createElement('div');
+      editBar.className = 'checklist-edit-bar';
+
+      const selectedCountEl = document.createElement('span');
+      selectedCountEl.className = 'checklist-edit-bar-count';
+      selectedCountEl.textContent = `${selectedCount}개 선택`;
+      editBar.appendChild(selectedCountEl);
+
+      const deleteSelectedButton = document.createElement('button');
+      deleteSelectedButton.type = 'button';
+      deleteSelectedButton.className = 'checklist-edit-bar-delete';
+      deleteSelectedButton.textContent = '선택 삭제';
+      deleteSelectedButton.disabled = selectedCount === 0;
+      deleteSelectedButton.addEventListener('click', () => {
+        if (!window.confirm(`선택한 준비물 ${selectedCount}개를 삭제할까요?`)) return;
+        handlers.onDeleteSelectedItems(section.id);
+      });
+      editBar.appendChild(deleteSelectedButton);
+
+      sectionEl.appendChild(editBar);
+    }
 
     const itemList = document.createElement('ul');
     itemList.className = 'checklist-item-list';
@@ -1442,60 +1479,56 @@ export function renderChecklistSections(listEl, sections, itemsBySectionId, hand
       const checkbox = document.createElement('input');
       checkbox.type = 'checkbox';
       checkbox.className = 'checklist-item-checkbox';
-      checkbox.checked = !!item.checked;
-      checkbox.setAttribute('aria-label', `${item.title} 완료 체크`);
-      checkbox.addEventListener('change', () => handlers.onToggleItem(item.id, checkbox.checked));
-
-      const title = document.createElement('span');
-      title.className = 'checklist-item-title';
-      title.textContent = item.title;
-
-      const itemEditForm = document.createElement('form');
-      itemEditForm.className = 'checklist-item-title-edit-form';
-      itemEditForm.hidden = true;
-      itemEditForm.innerHTML = `
-        <input type="text" name="title" value="${escapeHtml(item.title)}" maxlength="100" required aria-label="준비물 이름 수정" />
-        <button type="submit">저장</button>
-      `;
-      itemEditForm.addEventListener('submit', (event) => {
-        event.preventDefault();
-        const data = new FormData(itemEditForm);
-        const newTitle = data.get('title').trim();
-        if (!newTitle) return;
-        handlers.onEditItemTitle(item.id, newTitle);
-        itemEditForm.hidden = true;
-      });
-
-      const itemEditButton = document.createElement('button');
-      itemEditButton.type = 'button';
-      itemEditButton.className = 'checklist-item-edit';
-      itemEditButton.innerHTML = ICONS.pencil;
-      itemEditButton.setAttribute('aria-label', '준비물 이름 수정');
-      itemEditButton.addEventListener('click', () => {
-        itemEditForm.hidden = !itemEditForm.hidden;
-      });
-
-      const memoInput = document.createElement('input');
-      memoInput.type = 'text';
-      memoInput.className = 'checklist-item-memo';
-      memoInput.placeholder = '메모';
-      memoInput.setAttribute('aria-label', `${item.title} 메모`);
-      memoInput.value = item.memo || '';
-      memoInput.addEventListener('change', () => handlers.onMemoChange(item.id, memoInput.value.trim()));
-
-      const deleteItemButton = document.createElement('button');
-      deleteItemButton.type = 'button';
-      deleteItemButton.className = 'checklist-item-delete';
-      deleteItemButton.innerHTML = ICONS.x;
-      deleteItemButton.setAttribute('aria-label', '삭제');
-      deleteItemButton.addEventListener('click', () => handlers.onDeleteItem(item.id));
-
+      if (isEditMode) {
+        checkbox.checked = selectedItemIds.has(item.id);
+        checkbox.setAttribute('aria-label', `${item.title} 선택`);
+        checkbox.addEventListener('change', () => handlers.onToggleItemSelected(item.id));
+      } else {
+        checkbox.checked = !!item.checked;
+        checkbox.setAttribute('aria-label', `${item.title} 완료 체크`);
+        checkbox.addEventListener('change', () => handlers.onToggleItem(item.id, checkbox.checked));
+      }
       li.appendChild(checkbox);
-      li.appendChild(title);
-      li.appendChild(itemEditButton);
-      li.appendChild(memoInput);
-      li.appendChild(deleteItemButton);
-      li.appendChild(itemEditForm);
+
+      if (isEditMode) {
+        const titleInput = document.createElement('input');
+        titleInput.type = 'text';
+        titleInput.className = 'checklist-item-title-input';
+        titleInput.maxLength = 100;
+        titleInput.value = item.title;
+        titleInput.setAttribute('aria-label', '준비물 이름 수정');
+        titleInput.addEventListener('change', () => {
+          const newTitle = titleInput.value.trim();
+          if (!newTitle) {
+            titleInput.value = item.title;
+            return;
+          }
+          handlers.onEditItemTitle(item.id, newTitle);
+        });
+        li.appendChild(titleInput);
+
+        const memoInput = document.createElement('input');
+        memoInput.type = 'text';
+        memoInput.className = 'checklist-item-memo';
+        memoInput.placeholder = '메모';
+        memoInput.setAttribute('aria-label', `${item.title} 메모`);
+        memoInput.value = item.memo || '';
+        memoInput.addEventListener('change', () => handlers.onMemoChange(item.id, memoInput.value.trim()));
+        li.appendChild(memoInput);
+      } else {
+        const title = document.createElement('span');
+        title.className = 'checklist-item-title';
+        title.textContent = item.title;
+        li.appendChild(title);
+
+        if (item.memo) {
+          const memoText = document.createElement('span');
+          memoText.className = 'checklist-item-memo-text';
+          memoText.textContent = item.memo;
+          li.appendChild(memoText);
+        }
+      }
+
       itemList.appendChild(li);
     }
     sectionEl.appendChild(itemList);

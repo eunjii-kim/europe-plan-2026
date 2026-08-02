@@ -688,6 +688,8 @@ async function main() {
   let latestChecklistSections = [];
   let latestChecklistItems = [];
   let checklistOrderMigrated = false;
+  const checklistEditModeSectionIds = new Set();
+  const checklistSelectedItemIds = new Set();
   const renderChecklistTab = () => {
     const needsOrderMigration = latestChecklistSections.some((section) => typeof section.order !== 'number');
     if (needsOrderMigration && !checklistOrderMigrated && latestChecklistSections.length > 0) {
@@ -708,96 +710,127 @@ async function main() {
       list.push(item);
       itemsBySectionId.set(item.sectionId, list);
     }
-    renderChecklistSections(document.getElementById('checklistSectionList'), sortedSections, itemsBySectionId, {
-      onDeleteSection: async (sectionId) => {
-        try {
-          const itemsInSection = latestChecklistItems.filter((item) => item.sectionId === sectionId);
-          await Promise.all(itemsInSection.map((item) => deleteChecklistItem(item.id)));
-          await deleteChecklistSection(sectionId);
-        } catch (error) {
-          console.error('체크리스트 섹션 삭제 실패', error);
-          showFirebaseNotice();
-        }
+    renderChecklistSections(
+      document.getElementById('checklistSectionList'),
+      sortedSections,
+      itemsBySectionId,
+      checklistEditModeSectionIds,
+      checklistSelectedItemIds,
+      {
+        onDeleteSection: async (sectionId) => {
+          try {
+            const itemsInSection = latestChecklistItems.filter((item) => item.sectionId === sectionId);
+            await Promise.all(itemsInSection.map((item) => deleteChecklistItem(item.id)));
+            await deleteChecklistSection(sectionId);
+          } catch (error) {
+            console.error('체크리스트 섹션 삭제 실패', error);
+            showFirebaseNotice();
+          }
+        },
+        onAddItem: async (sectionId, title) => {
+          try {
+            await addChecklistItem(sectionId, title);
+          } catch (error) {
+            console.error('체크리스트 준비물 추가 실패', error);
+            showFirebaseNotice();
+          }
+        },
+        onToggleItem: async (itemId, checked) => {
+          try {
+            await toggleChecklistItem(itemId, checked);
+          } catch (error) {
+            console.error('체크리스트 준비물 체크 실패', error);
+            showFirebaseNotice();
+          }
+        },
+        onMemoChange: async (itemId, memo) => {
+          try {
+            await updateChecklistItemMemo(itemId, memo);
+          } catch (error) {
+            console.error('체크리스트 메모 저장 실패', error);
+            showFirebaseNotice();
+          }
+        },
+        onEditSectionTitle: async (sectionId, title) => {
+          try {
+            await updateChecklistSection(sectionId, { title });
+          } catch (error) {
+            console.error('체크리스트 섹션 이름 수정 실패', error);
+            showFirebaseNotice();
+          }
+        },
+        onEditItemTitle: async (itemId, title) => {
+          try {
+            await updateChecklistItemTitle(itemId, title);
+          } catch (error) {
+            console.error('체크리스트 준비물 이름 수정 실패', error);
+            showFirebaseNotice();
+          }
+        },
+        onMoveSectionUp: async (sectionId) => {
+          const index = sortedSections.findIndex((section) => section.id === sectionId);
+          if (index <= 0) return;
+          const current = sortedSections[index];
+          const neighbor = sortedSections[index - 1];
+          try {
+            await Promise.all([
+              updateChecklistSection(current.id, { order: neighbor.order ?? index - 1 }),
+              updateChecklistSection(neighbor.id, { order: current.order ?? index }),
+            ]);
+          } catch (error) {
+            console.error('체크리스트 섹션 순서 변경 실패', error);
+            showFirebaseNotice();
+          }
+        },
+        onMoveSectionDown: async (sectionId) => {
+          const index = sortedSections.findIndex((section) => section.id === sectionId);
+          if (index === -1 || index >= sortedSections.length - 1) return;
+          const current = sortedSections[index];
+          const neighbor = sortedSections[index + 1];
+          try {
+            await Promise.all([
+              updateChecklistSection(current.id, { order: neighbor.order ?? index + 1 }),
+              updateChecklistSection(neighbor.id, { order: current.order ?? index }),
+            ]);
+          } catch (error) {
+            console.error('체크리스트 섹션 순서 변경 실패', error);
+            showFirebaseNotice();
+          }
+        },
+        onToggleSectionEditMode: (sectionId) => {
+          if (checklistEditModeSectionIds.has(sectionId)) {
+            checklistEditModeSectionIds.delete(sectionId);
+            latestChecklistItems
+              .filter((item) => item.sectionId === sectionId)
+              .forEach((item) => checklistSelectedItemIds.delete(item.id));
+          } else {
+            checklistEditModeSectionIds.add(sectionId);
+          }
+          renderChecklistTab();
+        },
+        onToggleItemSelected: (itemId) => {
+          if (checklistSelectedItemIds.has(itemId)) {
+            checklistSelectedItemIds.delete(itemId);
+          } else {
+            checklistSelectedItemIds.add(itemId);
+          }
+          renderChecklistTab();
+        },
+        onDeleteSelectedItems: async (sectionId) => {
+          const idsToDelete = latestChecklistItems
+            .filter((item) => item.sectionId === sectionId && checklistSelectedItemIds.has(item.id))
+            .map((item) => item.id);
+          if (idsToDelete.length === 0) return;
+          try {
+            await Promise.all(idsToDelete.map((id) => deleteChecklistItem(id)));
+            idsToDelete.forEach((id) => checklistSelectedItemIds.delete(id));
+          } catch (error) {
+            console.error('체크리스트 준비물 일괄 삭제 실패', error);
+            showFirebaseNotice();
+          }
+        },
       },
-      onAddItem: async (sectionId, title) => {
-        try {
-          await addChecklistItem(sectionId, title);
-        } catch (error) {
-          console.error('체크리스트 준비물 추가 실패', error);
-          showFirebaseNotice();
-        }
-      },
-      onDeleteItem: async (itemId) => {
-        try {
-          await deleteChecklistItem(itemId);
-        } catch (error) {
-          console.error('체크리스트 준비물 삭제 실패', error);
-          showFirebaseNotice();
-        }
-      },
-      onToggleItem: async (itemId, checked) => {
-        try {
-          await toggleChecklistItem(itemId, checked);
-        } catch (error) {
-          console.error('체크리스트 준비물 체크 실패', error);
-          showFirebaseNotice();
-        }
-      },
-      onMemoChange: async (itemId, memo) => {
-        try {
-          await updateChecklistItemMemo(itemId, memo);
-        } catch (error) {
-          console.error('체크리스트 메모 저장 실패', error);
-          showFirebaseNotice();
-        }
-      },
-      onEditSectionTitle: async (sectionId, title) => {
-        try {
-          await updateChecklistSection(sectionId, { title });
-        } catch (error) {
-          console.error('체크리스트 섹션 이름 수정 실패', error);
-          showFirebaseNotice();
-        }
-      },
-      onEditItemTitle: async (itemId, title) => {
-        try {
-          await updateChecklistItemTitle(itemId, title);
-        } catch (error) {
-          console.error('체크리스트 준비물 이름 수정 실패', error);
-          showFirebaseNotice();
-        }
-      },
-      onMoveSectionUp: async (sectionId) => {
-        const index = sortedSections.findIndex((section) => section.id === sectionId);
-        if (index <= 0) return;
-        const current = sortedSections[index];
-        const neighbor = sortedSections[index - 1];
-        try {
-          await Promise.all([
-            updateChecklistSection(current.id, { order: neighbor.order ?? index - 1 }),
-            updateChecklistSection(neighbor.id, { order: current.order ?? index }),
-          ]);
-        } catch (error) {
-          console.error('체크리스트 섹션 순서 변경 실패', error);
-          showFirebaseNotice();
-        }
-      },
-      onMoveSectionDown: async (sectionId) => {
-        const index = sortedSections.findIndex((section) => section.id === sectionId);
-        if (index === -1 || index >= sortedSections.length - 1) return;
-        const current = sortedSections[index];
-        const neighbor = sortedSections[index + 1];
-        try {
-          await Promise.all([
-            updateChecklistSection(current.id, { order: neighbor.order ?? index + 1 }),
-            updateChecklistSection(neighbor.id, { order: current.order ?? index }),
-          ]);
-        } catch (error) {
-          console.error('체크리스트 섹션 순서 변경 실패', error);
-          showFirebaseNotice();
-        }
-      },
-    });
+    );
   };
 
   let latestBudgetOverridesMap = new Map();
