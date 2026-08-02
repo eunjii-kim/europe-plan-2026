@@ -1518,6 +1518,46 @@ main {
   cursor: pointer;
 }
 
+.checklist-section-edit-mode-toggle {
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--foreground);
+  font-size: 0.8rem;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.checklist-edit-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  margin-top: var(--spacing-2);
+  padding-top: var(--spacing-2);
+  border-top: 1px dashed var(--border);
+}
+
+.checklist-edit-bar-count {
+  color: var(--muted-foreground);
+  font-size: 0.85rem;
+  margin-right: auto;
+}
+
+.checklist-edit-bar-delete {
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--danger);
+  background: none;
+  color: var(--danger);
+  font-size: 0.8rem;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.checklist-edit-bar-delete:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
 .checklist-item-list {
   list-style: none;
   margin: var(--spacing-2) 0 0;
@@ -1549,28 +1589,13 @@ main {
   text-decoration: line-through;
 }
 
-.checklist-item-edit {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: var(--touch-target);
-  min-height: var(--touch-target);
-  border: none;
-  background: none;
+.checklist-item-memo-text {
   color: var(--muted-foreground);
-  cursor: pointer;
+  font-size: 0.8rem;
 }
 
-.checklist-item-title-edit-form {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--spacing-1);
-  align-items: center;
-  flex: 1 1 100%;
-}
-
-.checklist-item-title-edit-form input {
-  flex: 1;
+.checklist-item-title-input {
+  flex: 1 1 auto;
   min-width: 120px;
   padding: 4px 6px;
   border-radius: var(--radius-sm);
@@ -1578,16 +1603,6 @@ main {
   background: var(--background);
   color: var(--foreground);
   font-size: 0.8rem;
-}
-
-.checklist-item-title-edit-form button {
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: var(--primary);
-  color: var(--primary-foreground);
-  font-size: 0.75rem;
-  padding: 4px 10px;
-  cursor: pointer;
 }
 
 .checklist-item-memo {
@@ -1599,18 +1614,6 @@ main {
   background: var(--background);
   color: var(--foreground);
   font-size: 0.8rem;
-}
-
-.checklist-item-delete {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: var(--touch-target);
-  min-height: var(--touch-target);
-  border: none;
-  background: none;
-  color: var(--danger);
-  cursor: pointer;
 }
 
 .checklist-item-add-form {
