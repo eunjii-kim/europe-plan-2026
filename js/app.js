@@ -674,6 +674,7 @@ async function main() {
   };
 
   let latestExpenses = [];
+  let expensePerPersonView = false;
   const renderExpenseTab = () => {
     renderExpenseList(
       document.getElementById('expenseList'),
@@ -697,7 +698,10 @@ async function main() {
       },
       [...tripRegions, ...latestCustomRegions.map((r) => r.name)],
     );
-    renderExpenseStats(document.getElementById('expenseStats'), latestExpenses, rates);
+    renderExpenseStats(document.getElementById('expenseStats'), latestExpenses, rates, expensePerPersonView, () => {
+      expensePerPersonView = !expensePerPersonView;
+      renderExpenseTab();
+    });
   };
 
   let latestChecklistSections = [];

@@ -1168,6 +1168,7 @@ export function renderExpenseList(listEl, items, rates, onDelete, onEdit, region
         <th>금액</th>
         <th>화폐</th>
         <th>인원</th>
+        <th>1인당 금액</th>
         <th>수정</th>
         <th>삭제</th>
       </tr>
@@ -1188,6 +1189,7 @@ export function renderExpenseList(listEl, items, rates, onDelete, onEdit, region
       <td>${item.amount.toLocaleString('ko-KR')}${krwLabel}</td>
       <td>${item.currency}</td>
       <td>${item.headcount || 1}인</td>
+      <td>${formatKrw(perPersonKrw(item, rates))}</td>
       <td></td>
       <td></td>
     `;
@@ -1196,7 +1198,7 @@ export function renderExpenseList(listEl, items, rates, onDelete, onEdit, region
     editRow.className = 'expense-edit-row';
     editRow.hidden = true;
     const editRowCell = document.createElement('td');
-    editRowCell.colSpan = 9;
+    editRowCell.colSpan = 10;
     const editForm = renderExpenseEditForm(item, regions, (values) => {
       onEdit(item.id, values);
       editRow.hidden = true;
@@ -1212,7 +1214,7 @@ export function renderExpenseList(listEl, items, rates, onDelete, onEdit, region
     editButton.addEventListener('click', () => {
       editRow.hidden = !editRow.hidden;
     });
-    row.children[7].appendChild(editButton);
+    row.children[8].appendChild(editButton);
 
     const deleteButton = document.createElement('button');
     deleteButton.type = 'button';
@@ -1220,7 +1222,7 @@ export function renderExpenseList(listEl, items, rates, onDelete, onEdit, region
     deleteButton.innerHTML = ICONS.x;
     deleteButton.setAttribute('aria-label', '삭제');
     deleteButton.addEventListener('click', () => onDelete(item.id));
-    row.children[8].appendChild(deleteButton);
+    row.children[9].appendChild(deleteButton);
 
     tbody.appendChild(row);
     tbody.appendChild(editRow);
@@ -1272,24 +1274,34 @@ function renderExpenseBreakdownSection(title, groups, labelKey, resolveIcon) {
  * 지출 통계(총합, 카테고리·지역·국가별 소계)를 렌더링한다.
  * el은 <summary>를 담고 있는 <details> 요소이므로, summary는 보존한 채 나머지 내용만 다시 그린다.
  * @param {HTMLElement} el
- * @param {Array<{ category: string, region: string, amount: number, currency: string }>} expenses
+ * @param {Array<{ category: string, region: string, amount: number, currency: string, headcount: number }>} expenses
  * @param {{ CHF: number, EUR: number }} rates
+ * @param {boolean} perPerson - true면 모든 소계를 1인 기준 금액으로 표시
+ * @param {() => void} onTogglePerPerson
  */
-export function renderExpenseStats(el, expenses, rates) {
-  const totalKrw = calcExpenseTotalKrw(expenses, rates);
+export function renderExpenseStats(el, expenses, rates, perPerson, onTogglePerPerson) {
+  const totalKrw = calcExpenseTotalKrw(expenses, rates, perPerson);
 
   const summary = el.querySelector('summary');
   el.innerHTML = '';
   if (summary) el.appendChild(summary);
 
+  const toggleButton = document.createElement('button');
+  toggleButton.type = 'button';
+  toggleButton.className = 'expense-per-person-toggle';
+  toggleButton.textContent = '1인';
+  toggleButton.setAttribute('aria-pressed', String(perPerson));
+  toggleButton.addEventListener('click', () => onTogglePerPerson());
+  el.appendChild(toggleButton);
+
   const totalLine = document.createElement('p');
   totalLine.className = 'total-line';
-  totalLine.textContent = `총 지출: ${formatKrw(totalKrw)}`;
+  totalLine.textContent = `총 지출: ${formatKrw(totalKrw)}${perPerson ? ' (1인 기준)' : ''}`;
   el.appendChild(totalLine);
 
   const categorySection = renderExpenseBreakdownSection(
     '카테고리별',
-    groupExpenseByCategory(expenses, rates),
+    groupExpenseByCategory(expenses, rates, perPerson),
     'category',
     (category) => EXPENSE_CATEGORY_ICONS[category] || DEFAULT_EXPENSE_CATEGORY_ICON,
   );
@@ -1297,7 +1309,7 @@ export function renderExpenseStats(el, expenses, rates) {
 
   const countrySection = renderExpenseBreakdownSection(
     '국가별',
-    groupExpenseByCountry(expenses, rates),
+    groupExpenseByCountry(expenses, rates, perPerson),
     'country',
     (country) => COUNTRY_FLAGS[country] || DEFAULT_COUNTRY_FLAG,
   );
@@ -1305,7 +1317,7 @@ export function renderExpenseStats(el, expenses, rates) {
 
   const regionSection = renderExpenseBreakdownSection(
     '지역별',
-    groupExpenseByRegion(expenses, rates),
+    groupExpenseByRegion(expenses, rates, perPerson),
     'region',
     () => '📍',
   );

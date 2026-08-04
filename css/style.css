@@ -1198,7 +1198,7 @@ main {
 
 .expense-table {
   width: 100%;
-  min-width: 720px;
+  min-width: 820px;
   border-collapse: collapse;
 }
 
@@ -1292,6 +1292,25 @@ main {
 
 .expense-stats[open] > summary {
   margin-bottom: var(--spacing-2);
+}
+
+.expense-per-person-toggle {
+  padding: 6px var(--spacing-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--card);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  cursor: pointer;
+  margin-bottom: var(--spacing-2);
+}
+
+.expense-per-person-toggle[aria-pressed='true'] {
+  background: var(--primary-muted);
+  border-color: var(--primary);
+  color: var(--primary);
+  font-weight: 700;
 }
 
 .expense-breakdown-title {
