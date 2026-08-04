@@ -4,13 +4,18 @@ import {
   SWISS_REGIONS,
   ICONS,
   PLACE_CATEGORY_ICONS,
-  DEFAULT_PLACE_CATEGORY_ICON,
   EXPENSE_CATEGORIES,
   EXPENSE_CATEGORY_ICONS,
   DEFAULT_EXPENSE_CATEGORY_ICON,
 } from './constants.js';
 import { perPersonKrw, calcPlannedTotalKrw, groupCostByCategory, calcCustomBudgetTotalKrw, convertToKrw, formatKrw } from './budgetCalc.js';
-import { calcExpenseTotalKrw, groupExpenseByCategory, groupExpenseByRegion, groupExpenseByCountry } from './expenseCalc.js';
+import {
+  calcExpenseTotalKrw,
+  groupExpenseByCategory,
+  groupExpenseByRegion,
+  groupExpenseByCountry,
+  UNSPECIFIED_REGION_LABEL,
+} from './expenseCalc.js';
 
 /**
  * 'YYYY-MM-DD' 문자열을 시간대 이슈 없이 로컬 Date로 변환한다.
@@ -789,8 +794,8 @@ function ensurePlaceDetailModal() {
  */
 function openPlaceDetailModal(item) {
   const refs = ensurePlaceDetailModal();
-  const icon = PLACE_CATEGORY_ICONS[item.category] || DEFAULT_PLACE_CATEGORY_ICON;
-  refs.category.textContent = `${icon} ${item.category}`;
+  const icon = PLACE_CATEGORY_ICONS[item.category];
+  refs.category.textContent = icon ? `${icon} ${item.category}` : item.category;
   refs.favorite.innerHTML = item.favorite ? ICONS.starFilled : '';
   refs.title.textContent = item.title;
   refs.region.textContent = item.region ? `📍 ${item.region}` : '';
@@ -810,26 +815,49 @@ function openPlaceDetailModal(item) {
 }
 
 /**
- * "정보" 탭의 분류 필터 버튼(전체 + 분류별)과 즐겨찾기 필터 토글을 렌더링한다.
+ * "정보" 탭의 분류 필터 줄과 지역 필터 줄, 즐겨찾기 토글을 렌더링한다.
+ * 각 줄은 label + 가로 스크롤 버튼 목록으로 구성되고 줄바꿈되지 않는다.
  * @param {HTMLElement} containerEl
  * @param {string[]} categories - 고정 분류 + 사용자가 추가한 커스텀 분류 병합 목록
  * @param {string} activeCategory - PLACE_FILTER_ALL 또는 categories 중 하나
+ * @param {string[]} regions - 지역 select(아래 입력 폼)와 동일한 지역 목록. 지역 필터 버튼 소스로 재사용된다.
+ * @param {string} activeRegion - PLACE_FILTER_ALL, regions 중 하나, 또는 UNSPECIFIED_REGION_LABEL
  * @param {boolean} favoriteOnly - 즐겨찾기만 보기 필터 활성화 여부
  * @param {(category: string) => void} onSelectCategory
+ * @param {(region: string) => void} onSelectRegion
  * @param {() => void} onToggleFavorite
  */
-export function renderPlaceFilters(containerEl, categories, activeCategory, favoriteOnly, onSelectCategory, onToggleFavorite) {
+export function renderPlaceFilters(
+  containerEl,
+  categories,
+  activeCategory,
+  regions,
+  activeRegion,
+  favoriteOnly,
+  onSelectCategory,
+  onSelectRegion,
+  onToggleFavorite,
+) {
   containerEl.innerHTML = '';
+
+  const categoryRow = document.createElement('div');
+  categoryRow.className = 'place-filter-row';
+  const categoryLabel = document.createElement('span');
+  categoryLabel.className = 'place-filter-label';
+  categoryLabel.textContent = '분류';
+  const categoryScroll = document.createElement('div');
+  categoryScroll.className = 'place-filter-scroll';
+
   const allCategories = [PLACE_FILTER_ALL, ...categories];
   for (const category of allCategories) {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'place-filter-button';
     button.classList.toggle('is-active', category === activeCategory);
-    const icon = category === PLACE_FILTER_ALL ? '' : `${PLACE_CATEGORY_ICONS[category] || DEFAULT_PLACE_CATEGORY_ICON} `;
-    button.textContent = `${icon}${category}`;
+    const icon = category === PLACE_FILTER_ALL ? '' : PLACE_CATEGORY_ICONS[category] || '';
+    button.textContent = icon ? `${icon} ${category}` : category;
     button.addEventListener('click', () => onSelectCategory(category));
-    containerEl.appendChild(button);
+    categoryScroll.appendChild(button);
   }
 
   const favoriteButton = document.createElement('button');
@@ -838,7 +866,31 @@ export function renderPlaceFilters(containerEl, categories, activeCategory, favo
   favoriteButton.classList.toggle('is-active', favoriteOnly);
   favoriteButton.innerHTML = `${favoriteOnly ? ICONS.starFilled : ICONS.star} 즐겨찾기만 보기`;
   favoriteButton.addEventListener('click', () => onToggleFavorite());
-  containerEl.appendChild(favoriteButton);
+  categoryScroll.appendChild(favoriteButton);
+
+  categoryRow.append(categoryLabel, categoryScroll);
+
+  const regionRow = document.createElement('div');
+  regionRow.className = 'place-filter-row';
+  const regionLabel = document.createElement('span');
+  regionLabel.className = 'place-filter-label';
+  regionLabel.textContent = '지역';
+  const regionScroll = document.createElement('div');
+  regionScroll.className = 'place-filter-scroll';
+
+  const allRegions = [PLACE_FILTER_ALL, ...regions, UNSPECIFIED_REGION_LABEL];
+  for (const region of allRegions) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'place-filter-button';
+    button.classList.toggle('is-active', region === activeRegion);
+    button.textContent = region === PLACE_FILTER_ALL || region === UNSPECIFIED_REGION_LABEL ? region : `📍 ${region}`;
+    button.addEventListener('click', () => onSelectRegion(region));
+    regionScroll.appendChild(button);
+  }
+  regionRow.append(regionLabel, regionScroll);
+
+  containerEl.append(categoryRow, regionRow);
 }
 
 /**
@@ -854,9 +906,10 @@ function renderPlaceEditForm(item, categories, regions, onSave) {
   form.className = 'place-edit-form';
   const categoryOptions = categories
     .map((category) => {
-      const icon = PLACE_CATEGORY_ICONS[category] || DEFAULT_PLACE_CATEGORY_ICON;
+      const icon = PLACE_CATEGORY_ICONS[category] || '';
       const safeCategory = escapeHtml(category);
-      return `<option value="${safeCategory}" ${category === item.category ? 'selected' : ''}>${icon} ${safeCategory}</option>`;
+      const label = icon ? `${icon} ${safeCategory}` : safeCategory;
+      return `<option value="${safeCategory}" ${category === item.category ? 'selected' : ''}>${label}</option>`;
     })
     .join('');
   const regionOptions = regions
@@ -911,13 +964,13 @@ export function renderPlaceList(listEl, items, categories, regions, onDelete, on
   for (const item of items) {
     const li = document.createElement('li');
     li.className = 'place-list-item';
-    const icon = PLACE_CATEGORY_ICONS[item.category] || DEFAULT_PLACE_CATEGORY_ICON;
+    const icon = PLACE_CATEGORY_ICONS[item.category] || '';
     const regionTag = item.region ? `<span class="place-item-region">📍 ${escapeHtml(item.region)}</span>` : '';
 
     const main = document.createElement('div');
     main.className = 'place-item-main';
     main.innerHTML = `
-      <span class="place-item-category">${icon} ${escapeHtml(item.category)}</span>
+      <span class="place-item-category">${icon ? `${icon} ` : ''}${escapeHtml(item.category)}</span>
       <span class="place-item-title">${escapeHtml(item.title)}</span>
       ${regionTag}
     `;
@@ -1134,7 +1187,7 @@ export function renderExpenseList(listEl, items, rates, onDelete, onEdit, region
       <td>${item.region ? `📍 ${escapeHtml(item.region)}` : ''}</td>
       <td>${item.amount.toLocaleString('ko-KR')}${krwLabel}</td>
       <td>${item.currency}</td>
-      <td>${item.headcount > 1 ? `${item.headcount}인` : ''}</td>
+      <td>${item.headcount || 1}인</td>
       <td></td>
       <td></td>
     `;

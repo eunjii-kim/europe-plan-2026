@@ -847,12 +847,41 @@ main {
 
 .place-filters {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: var(--spacing-2);
   margin-bottom: var(--spacing-2);
 }
 
+.place-filter-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  min-width: 0;
+}
+
+.place-filter-label {
+  flex: none;
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--muted-foreground);
+}
+
+.place-filter-scroll {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: var(--spacing-2);
+  overflow-x: auto;
+  scrollbar-width: none;
+  min-width: 0;
+}
+
+.place-filter-scroll::-webkit-scrollbar {
+  display: none;
+}
+
 .place-filter-button {
+  flex: none;
   padding: 6px var(--spacing-3);
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);
@@ -874,7 +903,7 @@ main {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  margin-left: auto;
+  margin-left: var(--spacing-2);
 }
 
 .place-filter-favorite.is-active {

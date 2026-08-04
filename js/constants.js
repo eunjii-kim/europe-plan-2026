@@ -65,8 +65,6 @@ export const PLACE_CATEGORY_ICONS = {
   기타: '📌',
 };
 
-export const DEFAULT_PLACE_CATEGORY_ICON = '📌';
-
 /** "소비기록" 탭에서 쓰는 지출 분류 목록 */
 export const EXPENSE_CATEGORIES = ['식비', '교통', '숙소', '쇼핑', '입장료/투어', '기타'];
 
