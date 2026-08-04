@@ -10,7 +10,6 @@ import {
   ADD_NEW_CATEGORY_VALUE,
   PLACE_CATEGORIES,
   PLACE_CATEGORY_ICONS,
-  DEFAULT_PLACE_CATEGORY_ICON,
 } from './constants.js';
 import { getExchangeRates } from './exchangeRate.js';
 import {
@@ -30,6 +29,7 @@ import {
   PLACE_FILTER_ALL,
 } from './render.js';
 import { formatKrw, applyBudgetOverrides, applyCustomCostItems, groupCustomCostItemsByAnchorKey } from './budgetCalc.js';
+import { UNSPECIFIED_REGION_LABEL } from './expenseCalc.js';
 import { applyScheduleOverrides } from './scheduleCalc.js';
 import { setupScrollSpy } from './scrollSpy.js';
 import {
@@ -245,7 +245,10 @@ function populateCategorySelect(selectEl, categories) {
   populateSelectWithAddOption(selectEl, categories, {
     addNewOptionValue: ADD_NEW_CATEGORY_VALUE,
     addNewOptionLabel: '+ 새 분류 추가',
-    renderOptionLabel: (category) => `${PLACE_CATEGORY_ICONS[category] || DEFAULT_PLACE_CATEGORY_ICON} ${category}`,
+    renderOptionLabel: (category) => {
+      const icon = PLACE_CATEGORY_ICONS[category];
+      return icon ? `${icon} ${category}` : category;
+    },
   });
 }
 
@@ -491,7 +494,6 @@ async function main() {
   setupCategoryAddOption(placeCategoryInput, onAddCategory);
 
   const expenseDateInput = document.getElementById('expenseDateInput');
-  expenseDateInput.min = TRIP_INFO.startDate;
   expenseDateInput.max = TRIP_INFO.endDate;
 
   const rateStatusEl = document.getElementById('rateStatus');
@@ -602,13 +604,20 @@ async function main() {
 
   let latestPlaces = [];
   let placeFilterCategory = PLACE_FILTER_ALL;
+  let placeFilterRegion = PLACE_FILTER_ALL;
   let placeFavoriteOnly = false;
   const renderPlacesTab = () => {
     const allPlaceCategories = [...PLACE_CATEGORIES, ...latestCustomPlaceCategories.map((c) => c.name)];
+    const allPlaceRegions = [...tripRegions, ...latestCustomRegions.map((r) => r.name)];
     let filtered =
       placeFilterCategory === PLACE_FILTER_ALL
         ? latestPlaces
         : latestPlaces.filter((item) => item.category === placeFilterCategory);
+    if (placeFilterRegion === UNSPECIFIED_REGION_LABEL) {
+      filtered = filtered.filter((item) => !item.region);
+    } else if (placeFilterRegion !== PLACE_FILTER_ALL) {
+      filtered = filtered.filter((item) => item.region === placeFilterRegion);
+    }
     if (placeFavoriteOnly) {
       filtered = filtered.filter((item) => item.favorite === true);
     }
@@ -616,9 +625,15 @@ async function main() {
       document.getElementById('placeFilters'),
       allPlaceCategories,
       placeFilterCategory,
+      allPlaceRegions,
+      placeFilterRegion,
       placeFavoriteOnly,
       (category) => {
         placeFilterCategory = category;
+        renderPlacesTab();
+      },
+      (region) => {
+        placeFilterRegion = region;
         renderPlacesTab();
       },
       () => {
@@ -630,7 +645,7 @@ async function main() {
       document.getElementById('placeList'),
       filtered,
       allPlaceCategories,
-      [...tripRegions, ...latestCustomRegions.map((r) => r.name)],
+      allPlaceRegions,
       async (id) => {
         try {
           await deletePlace(id);
