@@ -1112,7 +1112,7 @@ function renderExpenseEditForm(item, regions, onSave) {
       ${regionOptions}
     </select>
     <input type="text" name="title" value="${escapeHtml(item.title || '')}" placeholder="항목명 (선택)" aria-label="항목명" maxlength="100" />
-    <input type="number" name="amount" value="${item.amount}" placeholder="금액" required min="0" step="1" aria-label="금액" />
+    <input type="number" name="amount" value="${item.amount}" placeholder="금액" required min="0" step="any" aria-label="금액" />
     <select name="currency" aria-label="화폐">
       <option value="KRW" ${item.currency === 'KRW' ? 'selected' : ''}>KRW</option>
       <option value="EUR" ${item.currency === 'EUR' ? 'selected' : ''}>EUR</option>
