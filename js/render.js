@@ -1398,7 +1398,7 @@ function createChecklistSectionTitleEdit(section, onEditSectionTitle) {
  * 체크리스트 섹션 목록(섹션별 준비물 포함)을 렌더링한다.
  * @param {HTMLElement} listEl
  * @param {Array<{ id: string, title: string }>} sections - order 기준으로 이미 정렬된 배열
- * @param {Map<string, Array<{ id: string, title: string, checked: boolean, memo: string }>>} itemsBySectionId
+ * @param {Map<string, Array<{ id: string, title: string, checked: boolean, memo: string, link: string }>>} itemsBySectionId
  * @param {Set<string>} editModeSectionIds - 편집모드 중인 섹션 id 집합
  * @param {Set<string>} selectedItemIds - 편집모드에서 삭제 선택된 item id 집합
  * @param {{
@@ -1406,6 +1406,7 @@ function createChecklistSectionTitleEdit(section, onEditSectionTitle) {
  *   onAddItem: (sectionId: string, title: string) => void,
  *   onToggleItem: (itemId: string, checked: boolean) => void,
  *   onMemoChange: (itemId: string, memo: string) => void,
+ *   onLinkChange: (itemId: string, link: string) => void,
  *   onEditSectionTitle: (sectionId: string, title: string) => void,
  *   onEditItemTitle: (itemId: string, title: string) => void,
  *   onMoveSectionUp: (sectionId: string) => void,
@@ -1580,18 +1581,48 @@ export function renderChecklistSections(listEl, sections, itemsBySectionId, edit
         memoInput.value = item.memo || '';
         memoInput.addEventListener('change', () => handlers.onMemoChange(item.id, memoInput.value.trim()));
         li.appendChild(memoInput);
+
+        const linkInput = document.createElement('input');
+        linkInput.type = 'url';
+        linkInput.className = 'checklist-item-link-input';
+        linkInput.placeholder = '링크';
+        linkInput.setAttribute('aria-label', `${item.title} 링크`);
+        linkInput.value = item.link || '';
+        linkInput.addEventListener('change', () => handlers.onLinkChange(item.id, linkInput.value.trim()));
+        li.appendChild(linkInput);
       } else {
+        const content = document.createElement('div');
+        content.className = 'checklist-item-content';
+
+        const titleRow = document.createElement('div');
+        titleRow.className = 'checklist-item-title-row';
+
         const title = document.createElement('span');
         title.className = 'checklist-item-title';
         title.textContent = item.title;
-        li.appendChild(title);
+        titleRow.appendChild(title);
+
+        if (item.link) {
+          const link = document.createElement('a');
+          link.className = 'checklist-item-link';
+          link.href = item.link;
+          link.target = '_blank';
+          link.rel = 'noopener noreferrer';
+          link.textContent = '🔗';
+          link.setAttribute('aria-label', `${item.title} 링크 열기`);
+          titleRow.appendChild(link);
+        }
+
+        content.appendChild(titleRow);
 
         if (item.memo) {
           const memoText = document.createElement('span');
           memoText.className = 'checklist-item-memo-text';
           memoText.textContent = item.memo;
-          li.appendChild(memoText);
+          content.appendChild(memoText);
         }
+
+        li.appendChild(content);
       }
 
       itemList.appendChild(li);

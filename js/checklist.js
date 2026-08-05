@@ -67,7 +67,7 @@ export async function updateChecklistSection(sectionId, values) {
 
 /**
  * 섹션별 준비물 목록을 실시간으로 구독한다.
- * @param {(items: Array<{ id: string, sectionId: string, title: string, checked: boolean, memo: string }>) => void} onChange
+ * @param {(items: Array<{ id: string, sectionId: string, title: string, checked: boolean, memo: string, link: string }>) => void} onChange
  * @param {(error: Error) => void} onError
  * @returns {() => void} 구독 해제 함수
  */
@@ -98,6 +98,7 @@ export async function addChecklistItem(sectionId, title) {
     title,
     checked: false,
     memo: '',
+    link: '',
     createdAt: serverTimestamp(),
   });
 }
@@ -129,6 +130,16 @@ export async function toggleChecklistItem(itemId, checked) {
  */
 export async function updateChecklistItemMemo(itemId, memo) {
   await updateDoc(doc(checklistItemsCollection, itemId), { memo });
+}
+
+/**
+ * 준비물의 링크를 수정한다.
+ * @param {string} itemId
+ * @param {string} link
+ * @returns {Promise<void>}
+ */
+export async function updateChecklistItemLink(itemId, link) {
+  await updateDoc(doc(checklistItemsCollection, itemId), { link });
 }
 
 /**

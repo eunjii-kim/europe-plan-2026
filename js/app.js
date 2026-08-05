@@ -62,6 +62,7 @@ import {
   deleteChecklistItem,
   toggleChecklistItem,
   updateChecklistItemMemo,
+  updateChecklistItemLink,
   updateChecklistItemTitle,
 } from './checklist.js';
 import { subscribeToCustomRegions, addCustomRegion } from './customRegions.js';
@@ -767,6 +768,14 @@ async function main() {
             await updateChecklistItemMemo(itemId, memo);
           } catch (error) {
             console.error('체크리스트 메모 저장 실패', error);
+            showFirebaseNotice();
+          }
+        },
+        onLinkChange: async (itemId, link) => {
+          try {
+            await updateChecklistItemLink(itemId, link);
+          } catch (error) {
+            console.error('체크리스트 링크 저장 실패', error);
             showFirebaseNotice();
           }
         },
