@@ -445,13 +445,14 @@ function renderLinkedPlaceList(block, handlers) {
 }
 
 /**
- * 대분류를 고르면 그 분류에 속한 장소(소분류) 목록이 갱신되는, 일정 블록용 "정보 추가" 인라인 폼을 만든다.
- * @param {Array<{ id: string, category: string, title: string }>} places
+ * 대분류/지역을 고르면 그 조건에 맞는 장소(소분류) 목록이 갱신되는, 일정 블록용 "정보 추가" 인라인 폼을 만든다.
+ * @param {Array<{ id: string, category: string, title: string, region: string }>} places
  * @param {string[]} placeCategories
+ * @param {string[]} placeRegions
  * @param {(values: { placeId: string, category: string, title: string, budget: { currency: string, amount: number } | null }) => void} onAdd
  * @returns {HTMLFormElement}
  */
-function renderLinkedPlaceAddForm(places, placeCategories, onAdd) {
+function renderLinkedPlaceAddForm(places, placeCategories, placeRegions, onAdd) {
   const form = document.createElement('form');
   form.className = 'linked-place-add-form';
   form.hidden = true;
@@ -464,8 +465,13 @@ function renderLinkedPlaceAddForm(places, placeCategories, onAdd) {
     })
     .join('');
 
+  const regionOptions = [PLACE_FILTER_ALL, ...placeRegions, UNSPECIFIED_REGION_LABEL]
+    .map((region) => `<option value="${escapeHtml(region)}">${escapeHtml(region)}</option>`)
+    .join('');
+
   form.innerHTML = `
     <select name="category" aria-label="대분류">${categoryOptions}</select>
+    <select name="region" aria-label="지역 필터">${regionOptions}</select>
     <select name="placeId" aria-label="소분류"></select>
     <select name="currency" aria-label="화폐">
       <option value="KRW">KRW</option>
@@ -477,16 +483,24 @@ function renderLinkedPlaceAddForm(places, placeCategories, onAdd) {
   `;
 
   const categorySelect = form.elements.category;
+  const regionSelect = form.elements.region;
   const placeSelect = form.elements.placeId;
 
   const refreshPlaceOptions = () => {
-    const options = places.filter((place) => place.category === categorySelect.value);
+    const region = regionSelect.value;
+    const options = places.filter((place) => {
+      if (place.category !== categorySelect.value) return false;
+      if (region === PLACE_FILTER_ALL) return true;
+      if (region === UNSPECIFIED_REGION_LABEL) return !place.region;
+      return place.region === region;
+    });
     placeSelect.innerHTML = options.length
       ? options.map((place) => `<option value="${escapeHtml(place.id)}">${escapeHtml(place.title)}</option>`).join('')
       : '<option value="">등록된 장소 없음</option>';
     placeSelect.disabled = options.length === 0;
   };
   categorySelect.addEventListener('change', refreshPlaceOptions);
+  regionSelect.addEventListener('change', refreshPlaceOptions);
   refreshPlaceOptions();
 
   form.addEventListener('submit', (event) => {
@@ -517,11 +531,12 @@ function renderLinkedPlaceAddForm(places, placeCategories, onAdd) {
  * @param {{ CHF: number, EUR: number }} rates
  * @param {object} handlers
  * @param {boolean} editMode
- * @param {Array<{ id: string, category: string, title: string }>} [places] - "정보 추가" 메뉴에서 고를 수 있는 장소 목록
+ * @param {Array<{ id: string, category: string, title: string, region: string }>} [places] - "정보 추가" 메뉴에서 고를 수 있는 장소 목록
  * @param {string[]} [placeCategories] - "정보 추가" 메뉴의 대분류 목록
+ * @param {string[]} [placeRegions] - "정보 추가" 메뉴의 지역 필터 목록
  * @returns {HTMLElement}
  */
-function renderTimeBlock(block, rates, handlers, editMode, places = [], placeCategories = []) {
+function renderTimeBlock(block, rates, handlers, editMode, places = [], placeCategories = [], placeRegions = []) {
   const wrapper = document.createElement('div');
   wrapper.className = 'time-block';
 
@@ -558,7 +573,7 @@ function renderTimeBlock(block, rates, handlers, editMode, places = [], placeCat
   infoMenu.appendChild(addInfoButton);
   wrapper.appendChild(infoMenu);
 
-  const linkedPlaceForm = renderLinkedPlaceAddForm(places, placeCategories, (values) => {
+  const linkedPlaceForm = renderLinkedPlaceAddForm(places, placeCategories, placeRegions, (values) => {
     handlers.onAddLinkedPlace(block, { id: crypto.randomUUID(), ...values });
   });
   wrapper.appendChild(linkedPlaceForm);
@@ -753,8 +768,9 @@ function renderAddBlockSection(dayId, onAdd) {
  * @param {boolean} editMode
  * @param {Set<string> | null} [openDayIds] - 이전 렌더링에서 열려있던 day.id 목록. 주어지면 이 상태를 그대로 복원하고,
  *   없으면(최초 렌더링) todayDayId/첫 번째 카드를 여는 기본 로직을 쓴다.
- * @param {Array<{ id: string, category: string, title: string }>} [places] - "정보 추가" 메뉴에서 고를 수 있는 장소 목록
+ * @param {Array<{ id: string, category: string, title: string, region: string }>} [places] - "정보 추가" 메뉴에서 고를 수 있는 장소 목록
  * @param {string[]} [placeCategories] - "정보 추가" 메뉴의 대분류 목록
+ * @param {string[]} [placeRegions] - "정보 추가" 메뉴의 지역 필터 목록
  */
 export function renderDayList(
   listEl,
@@ -766,6 +782,7 @@ export function renderDayList(
   openDayIds = null,
   places = [],
   placeCategories = [],
+  placeRegions = [],
 ) {
   listEl.innerHTML = '';
   closeTimeBlockInfoMenu();
@@ -790,7 +807,7 @@ export function renderDayList(
     const blockList = document.createElement('div');
     blockList.className = 'time-block-list';
     for (const block of day.timeBlocks) {
-      blockList.appendChild(renderTimeBlock(block, rates, handlers, editMode, places, placeCategories));
+      blockList.appendChild(renderTimeBlock(block, rates, handlers, editMode, places, placeCategories, placeRegions));
     }
     card.appendChild(blockList);
 
