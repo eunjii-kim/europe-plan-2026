@@ -49,6 +49,7 @@ import {
   addScheduleCustomBlock,
   deleteScheduleCustomBlock,
   updateScheduleCustomBlockAttachments,
+  updateScheduleCustomBlockLinkedPlaces,
 } from './schedule.js';
 import { subscribeToPlaces, addPlace, deletePlace, updatePlace, toggleFavoritePlace } from './places.js';
 import { subscribeToExpenses, addExpense, deleteExpense, updateExpense } from './expenses.js';
@@ -271,6 +272,26 @@ function getOpenDayIds(listEl) {
   return new Set([...listEl.querySelectorAll('.day-card[open]')].map((card) => card.id));
 }
 
+/**
+ * 병합된 일정 데이터에서 일정에 연결된 장소들을 placeId별 방문 날짜(MM/DD) 목록으로 모은다.
+ * @param {Array} effectiveScheduleData - applyScheduleOverrides 등을 거친 병합 일정 데이터
+ * @returns {Map<string, string[]>}
+ */
+function buildPlaceScheduleDates(effectiveScheduleData) {
+  const map = new Map();
+  for (const day of effectiveScheduleData) {
+    const monthDay = `${day.date.slice(5, 7)}/${day.date.slice(8, 10)}`;
+    for (const block of day.timeBlocks) {
+      for (const entry of block.linkedPlaces || []) {
+        const dates = map.get(entry.placeId) || [];
+        if (!dates.includes(monthDay)) dates.push(monthDay);
+        map.set(entry.placeId, dates);
+      }
+    }
+  }
+  return map;
+}
+
 /** 일정 탭의 모두 펼치기/모두 접기 버튼을 연결한다. */
 function setupExpandCollapseButtons() {
   const dayList = document.getElementById('dayList');
@@ -414,6 +435,27 @@ async function saveBlockAttachments(block, attachments) {
       title: block.title,
       note: block.note || '',
       attachments,
+      linkedPlaces: block.linkedPlaces || [],
+    });
+  }
+}
+
+/**
+ * 일정 블록(기존 블록 또는 사용자가 추가한 블록)에 연결된 정보(장소) 목록을 저장한다.
+ * @param {object} block
+ * @param {Array<{ id: string, placeId: string, category: string, title: string, budget?: { currency: string, amount: number } }>} linkedPlaces
+ * @returns {Promise<void>}
+ */
+async function saveBlockLinkedPlaces(block, linkedPlaces) {
+  if (block.isCustom) {
+    await updateScheduleCustomBlockLinkedPlaces(block.customId, linkedPlaces);
+  } else {
+    await setScheduleOverride(block.blockKey, {
+      time: block.time,
+      title: block.title,
+      note: block.note || '',
+      attachments: block.attachments || [],
+      linkedPlaces,
     });
   }
 }
@@ -598,12 +640,29 @@ async function main() {
         showFirebaseNotice();
       }
     },
+    onAddLinkedPlace: async (block, entry) => {
+      try {
+        await saveBlockLinkedPlaces(block, [...(block.linkedPlaces || []), entry]);
+      } catch (error) {
+        console.error('정보 연결 실패', error);
+        showFirebaseNotice();
+      }
+    },
+    onRemoveLinkedPlace: async (block, entryId) => {
+      try {
+        await saveBlockLinkedPlaces(block, (block.linkedPlaces || []).filter((entry) => entry.id !== entryId));
+      } catch (error) {
+        console.error('정보 연결 해제 실패', error);
+        showFirebaseNotice();
+      }
+    },
   };
 
   const dayNavEl = document.getElementById('dayNav');
   const tabBarEl = document.querySelector('.tab-bar');
 
   let latestPlaces = [];
+  let latestEffectiveScheduleData = [];
   let placeFilterCategory = PLACE_FILTER_ALL;
   let placeFilterRegion = PLACE_FILTER_ALL;
   let placeFavoriteOnly = false;
@@ -647,6 +706,7 @@ async function main() {
       filtered,
       allPlaceCategories,
       allPlaceRegions,
+      buildPlaceScheduleDates(latestEffectiveScheduleData),
       async (id) => {
         try {
           await deletePlace(id);
@@ -869,9 +929,21 @@ async function main() {
     const budgetApplied = applyBudgetOverrides(itineraryData, latestBudgetOverridesMap);
     const scheduleApplied = applyScheduleOverrides(budgetApplied, latestScheduleOverridesMap, latestCustomBlocksByDay);
     const effectiveData = applyCustomCostItems(scheduleApplied, groupCustomCostItemsByAnchorKey(latestBudgetOverridesMap));
+    latestEffectiveScheduleData = effectiveData;
     const openDayIds = hasRenderedScheduleOnce ? getOpenDayIds(dayListEl) : null;
     renderDayNav(dayNavEl, effectiveData);
-    renderDayList(dayListEl, effectiveData, rates, todayDayId, handlers, isEditModeOn(), openDayIds);
+    const linkedPlaceCategories = [...PLACE_CATEGORIES, ...latestCustomPlaceCategories.map((c) => c.name)];
+    renderDayList(
+      dayListEl,
+      effectiveData,
+      rates,
+      todayDayId,
+      handlers,
+      isEditModeOn(),
+      openDayIds,
+      latestPlaces,
+      linkedPlaceCategories,
+    );
     hasRenderedScheduleOnce = true;
     plannedTotal = renderBudgetSummary(
       document.getElementById('categoryBreakdown'),
@@ -881,6 +953,7 @@ async function main() {
     );
     updateGrandTotal();
     renderExpenseTab();
+    renderPlacesTab();
     setupScrollSpy(dayListEl, dayNavEl, tabBarEl);
   };
 
@@ -934,7 +1007,7 @@ async function main() {
     subscribeToBudgetItems(renderCustomBudgetList, () => showFirebaseNotice());
     subscribeToPlaces((items) => {
       latestPlaces = items;
-      renderPlacesTab();
+      renderScheduleAndSummary();
     }, () => showFirebaseNotice());
     subscribeToExpenses((items) => {
       latestExpenses = items;
@@ -956,7 +1029,7 @@ async function main() {
     subscribeToCustomPlaceCategories((categories) => {
       latestCustomPlaceCategories = categories;
       refreshCategorySelects();
-      renderPlacesTab();
+      renderScheduleAndSummary();
     }, () => showFirebaseNotice());
   }
 }

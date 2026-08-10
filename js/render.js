@@ -239,7 +239,11 @@ function renderTimeBlockEditControls(block, handlers) {
     editButton.setAttribute('aria-label', '일정 수정');
 
     form = renderTimeBlockEditForm(block, (values) => {
-      handlers.onEditBlock(block.blockKey, { ...values, attachments: block.attachments || [] });
+      handlers.onEditBlock(block.blockKey, {
+        ...values,
+        attachments: block.attachments || [],
+        linkedPlaces: block.linkedPlaces || [],
+      });
       form.hidden = true;
     });
     form.hidden = true;
@@ -274,6 +278,7 @@ function renderTimeBlockEditControls(block, handlers) {
         title: block.title,
         note: block.note || '',
         attachments: block.attachments || [],
+        linkedPlaces: block.linkedPlaces || [],
       });
     }
   });
@@ -376,15 +381,147 @@ function renderAttachmentsSection(block, handlers, editMode) {
   return wrapper;
 }
 
+/** 롱프레스로 메뉴/액션을 여는 데 공통으로 쓰는 대기 시간(ms). */
+const LONG_PRESS_MS = 500;
+
+/**
+ * 롱프레스를 막아야 하는 인터랙티브 요소(링크/버튼/입력 등) 위인지 판별한다.
+ * @param {EventTarget} target
+ * @returns {boolean}
+ */
+function isInteractiveTarget(target) {
+  return !!target.closest('a, button, input, textarea, select');
+}
+
+/**
+ * 일정 탭에서 롱프레스로 열린 "정보 추가" 메뉴 상태. 한 번에 하나만 열려있을 수 있다.
+ * @type {{ wrapper: HTMLElement, menuEl: HTMLElement } | null}
+ */
+let openTimeBlockInfoMenu = null;
+
+function closeTimeBlockInfoMenu() {
+  if (!openTimeBlockInfoMenu) return;
+  openTimeBlockInfoMenu.menuEl.hidden = true;
+  openTimeBlockInfoMenu = null;
+}
+
+document.addEventListener('click', (event) => {
+  if (!openTimeBlockInfoMenu) return;
+  if (openTimeBlockInfoMenu.wrapper.contains(event.target)) return;
+  closeTimeBlockInfoMenu();
+});
+
+/**
+ * 일정 블록에 연결된 정보(장소) 목록을 칩 형태로 렌더링한다. 각 칩에 연결 해제 버튼이 붙는다.
+ * @param {object} block
+ * @param {object} handlers
+ * @returns {HTMLElement}
+ */
+function renderLinkedPlaceList(block, handlers) {
+  const list = document.createElement('ul');
+  list.className = 'linked-place-list';
+  for (const entry of block.linkedPlaces || []) {
+    const li = document.createElement('li');
+    li.className = 'linked-place-item';
+
+    const label = document.createElement('span');
+    const budgetLabel = entry.budget
+      ? ` · 총 ${entry.budget.amount.toLocaleString('ko-KR')} ${entry.budget.currency}`
+      : '';
+    label.textContent = `${entry.category}: ${entry.title}${budgetLabel}`;
+    li.appendChild(label);
+
+    const removeButton = document.createElement('button');
+    removeButton.type = 'button';
+    removeButton.className = 'linked-place-remove-button';
+    removeButton.innerHTML = ICONS.x;
+    removeButton.setAttribute('aria-label', `${entry.title} 연결 해제`);
+    removeButton.addEventListener('click', () => handlers.onRemoveLinkedPlace(block, entry.id));
+    li.appendChild(removeButton);
+
+    list.appendChild(li);
+  }
+  return list;
+}
+
+/**
+ * 대분류를 고르면 그 분류에 속한 장소(소분류) 목록이 갱신되는, 일정 블록용 "정보 추가" 인라인 폼을 만든다.
+ * @param {Array<{ id: string, category: string, title: string }>} places
+ * @param {string[]} placeCategories
+ * @param {(values: { placeId: string, category: string, title: string, budget: { currency: string, amount: number } | null }) => void} onAdd
+ * @returns {HTMLFormElement}
+ */
+function renderLinkedPlaceAddForm(places, placeCategories, onAdd) {
+  const form = document.createElement('form');
+  form.className = 'linked-place-add-form';
+  form.hidden = true;
+
+  const categoryOptions = placeCategories
+    .map((category) => {
+      const icon = PLACE_CATEGORY_ICONS[category] || '';
+      const label = icon ? `${icon} ${category}` : category;
+      return `<option value="${escapeHtml(category)}">${escapeHtml(label)}</option>`;
+    })
+    .join('');
+
+  form.innerHTML = `
+    <select name="category" aria-label="대분류">${categoryOptions}</select>
+    <select name="placeId" aria-label="소분류"></select>
+    <select name="currency" aria-label="화폐">
+      <option value="KRW">KRW</option>
+      <option value="EUR">EUR</option>
+      <option value="CHF">CHF</option>
+    </select>
+    <input type="number" name="amount" placeholder="예산 (선택)" min="0" step="any" aria-label="예산" />
+    <button type="submit">추가</button>
+  `;
+
+  const categorySelect = form.elements.category;
+  const placeSelect = form.elements.placeId;
+
+  const refreshPlaceOptions = () => {
+    const options = places.filter((place) => place.category === categorySelect.value);
+    placeSelect.innerHTML = options.length
+      ? options.map((place) => `<option value="${escapeHtml(place.id)}">${escapeHtml(place.title)}</option>`).join('')
+      : '<option value="">등록된 장소 없음</option>';
+    placeSelect.disabled = options.length === 0;
+  };
+  categorySelect.addEventListener('change', refreshPlaceOptions);
+  refreshPlaceOptions();
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const data = new FormData(form);
+    const placeId = data.get('placeId');
+    if (!placeId) return;
+    const selectedPlace = places.find((place) => place.id === placeId);
+    if (!selectedPlace) return;
+    const amount = Number(data.get('amount'));
+    onAdd({
+      placeId,
+      category: selectedPlace.category,
+      title: selectedPlace.title,
+      budget: Number.isFinite(amount) && amount > 0 ? { currency: data.get('currency'), amount } : null,
+    });
+    form.reset();
+    refreshPlaceOptions();
+    form.hidden = true;
+  });
+
+  return form;
+}
+
 /**
  * timeBlock 하나의 DOM 요소를 만든다.
  * @param {object} block
  * @param {{ CHF: number, EUR: number }} rates
  * @param {object} handlers
  * @param {boolean} editMode
+ * @param {Array<{ id: string, category: string, title: string }>} [places] - "정보 추가" 메뉴에서 고를 수 있는 장소 목록
+ * @param {string[]} [placeCategories] - "정보 추가" 메뉴의 대분류 목록
  * @returns {HTMLElement}
  */
-function renderTimeBlock(block, rates, handlers, editMode) {
+function renderTimeBlock(block, rates, handlers, editMode, places = [], placeCategories = []) {
   const wrapper = document.createElement('div');
   wrapper.className = 'time-block';
 
@@ -406,6 +543,53 @@ function renderTimeBlock(block, rates, handlers, editMode) {
     tag.textContent = `📍 ${block.locationTag}`;
     wrapper.insertBefore(tag, main);
   }
+
+  if (block.linkedPlaces && block.linkedPlaces.length > 0) {
+    wrapper.appendChild(renderLinkedPlaceList(block, handlers));
+  }
+
+  const infoMenu = document.createElement('div');
+  infoMenu.className = 'time-block-info-menu';
+  infoMenu.hidden = true;
+  const addInfoButton = document.createElement('button');
+  addInfoButton.type = 'button';
+  addInfoButton.className = 'time-block-info-menu-button';
+  addInfoButton.textContent = '➕ 정보 추가';
+  infoMenu.appendChild(addInfoButton);
+  wrapper.appendChild(infoMenu);
+
+  const linkedPlaceForm = renderLinkedPlaceAddForm(places, placeCategories, (values) => {
+    handlers.onAddLinkedPlace(block, { id: crypto.randomUUID(), ...values });
+  });
+  wrapper.appendChild(linkedPlaceForm);
+
+  addInfoButton.addEventListener('click', () => {
+    closeTimeBlockInfoMenu();
+    linkedPlaceForm.hidden = false;
+  });
+
+  let longPressTimer = null;
+  const startLongPress = (event) => {
+    if (isInteractiveTarget(event.target)) return;
+    clearTimeout(longPressTimer);
+    longPressTimer = setTimeout(() => {
+      closeTimeBlockInfoMenu();
+      infoMenu.hidden = false;
+      openTimeBlockInfoMenu = { wrapper, menuEl: infoMenu };
+    }, LONG_PRESS_MS);
+  };
+  const cancelLongPress = () => {
+    clearTimeout(longPressTimer);
+    longPressTimer = null;
+  };
+  wrapper.addEventListener('mousedown', startLongPress);
+  wrapper.addEventListener('mouseup', cancelLongPress);
+  wrapper.addEventListener('mouseleave', cancelLongPress);
+  wrapper.addEventListener('touchstart', startLongPress, { passive: true });
+  wrapper.addEventListener('touchmove', cancelLongPress);
+  wrapper.addEventListener('touchend', cancelLongPress);
+  wrapper.addEventListener('touchcancel', cancelLongPress);
+  wrapper.addEventListener('contextmenu', (event) => event.preventDefault());
 
   let editForm = null;
   if (editMode) {
@@ -569,9 +753,22 @@ function renderAddBlockSection(dayId, onAdd) {
  * @param {boolean} editMode
  * @param {Set<string> | null} [openDayIds] - 이전 렌더링에서 열려있던 day.id 목록. 주어지면 이 상태를 그대로 복원하고,
  *   없으면(최초 렌더링) todayDayId/첫 번째 카드를 여는 기본 로직을 쓴다.
+ * @param {Array<{ id: string, category: string, title: string }>} [places] - "정보 추가" 메뉴에서 고를 수 있는 장소 목록
+ * @param {string[]} [placeCategories] - "정보 추가" 메뉴의 대분류 목록
  */
-export function renderDayList(listEl, itineraryData, rates, todayDayId, handlers, editMode, openDayIds = null) {
+export function renderDayList(
+  listEl,
+  itineraryData,
+  rates,
+  todayDayId,
+  handlers,
+  editMode,
+  openDayIds = null,
+  places = [],
+  placeCategories = [],
+) {
   listEl.innerHTML = '';
+  closeTimeBlockInfoMenu();
   itineraryData.forEach((day, index) => {
     const { accentVar, bgVar, flag } = getCountryAccent(day.region);
     const card = document.createElement('details');
@@ -593,7 +790,7 @@ export function renderDayList(listEl, itineraryData, rates, todayDayId, handlers
     const blockList = document.createElement('div');
     blockList.className = 'time-block-list';
     for (const block of day.timeBlocks) {
-      blockList.appendChild(renderTimeBlock(block, rates, handlers, editMode));
+      blockList.appendChild(renderTimeBlock(block, rates, handlers, editMode, places, placeCategories));
     }
     card.appendChild(blockList);
 
@@ -946,11 +1143,12 @@ function renderPlaceEditForm(item, categories, regions, onSave) {
  * @param {Array<{ id: string, category: string, title: string, region: string, link: string, memo: string, favorite: boolean }>} items
  * @param {string[]} categories - 고정 분류 + 사용자가 추가한 커스텀 분류 병합 목록
  * @param {string[]} regions - 수정 폼의 지역 select에 채울 옵션 목록
+ * @param {Map<string, string[]>} placeScheduleDates - 장소 id별로 일정에 연결된 날짜(MM/DD) 목록
  * @param {(id: string) => void} onDelete
  * @param {(id: string, values: object) => void} onEdit
  * @param {(id: string, favorite: boolean) => void} onToggleFavorite
  */
-export function renderPlaceList(listEl, items, categories, regions, onDelete, onEdit, onToggleFavorite) {
+export function renderPlaceList(listEl, items, categories, regions, placeScheduleDates, onDelete, onEdit, onToggleFavorite) {
   listEl.innerHTML = '';
   closePlaceActionsMenu();
   closePlaceDetailModal();
@@ -966,6 +1164,11 @@ export function renderPlaceList(listEl, items, categories, regions, onDelete, on
     li.className = 'place-list-item';
     const icon = PLACE_CATEGORY_ICONS[item.category] || '';
     const regionTag = item.region ? `<span class="place-item-region">📍 ${escapeHtml(item.region)}</span>` : '';
+    const scheduleDates = placeScheduleDates.get(item.id);
+    const scheduleTag =
+      scheduleDates && scheduleDates.length > 0
+        ? `<span class="place-item-schedule">🗓️ 일정: ${scheduleDates.map((date) => escapeHtml(date)).join(', ')}</span>`
+        : '';
 
     const main = document.createElement('div');
     main.className = 'place-item-main';
@@ -973,6 +1176,7 @@ export function renderPlaceList(listEl, items, categories, regions, onDelete, on
       <span class="place-item-category">${icon ? `${icon} ` : ''}${escapeHtml(item.category)}</span>
       <span class="place-item-title">${escapeHtml(item.title)}</span>
       ${regionTag}
+      ${scheduleTag}
     `;
     li.appendChild(main);
 
@@ -1044,9 +1248,7 @@ export function renderPlaceList(listEl, items, categories, regions, onDelete, on
     li.appendChild(actionsEl);
     li.appendChild(editForm);
 
-    const LONG_PRESS_MS = 500;
     let longPressTimer = null;
-    const isInteractiveTarget = (target) => !!target.closest('a, button, input, textarea, select');
 
     const startLongPress = (event) => {
       if (isInteractiveTarget(event.target)) return;

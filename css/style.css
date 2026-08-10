@@ -328,8 +328,11 @@ main {
 }
 
 .time-block {
+  position: relative;
   border-top: 1px solid var(--border);
   padding-top: var(--spacing-2);
+  -webkit-touch-callout: none;
+  user-select: none;
 }
 
 .location-tag {
@@ -533,6 +536,99 @@ main {
 }
 
 .attachment-add-form button {
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-size: 0.75rem;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.linked-place-list {
+  list-style: none;
+  padding: 0;
+  margin: 2px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-1);
+}
+
+.linked-place-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--muted);
+  color: var(--foreground);
+  font-size: 0.75rem;
+}
+
+.linked-place-remove-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  min-height: 16px;
+  border: none;
+  background: none;
+  color: var(--muted-foreground);
+  cursor: pointer;
+}
+
+.linked-place-remove-button svg {
+  width: 12px;
+  height: 12px;
+}
+
+.time-block-info-menu {
+  position: absolute;
+  top: 4px;
+  right: 0;
+  z-index: 2;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--card);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.15);
+}
+
+.time-block-info-menu-button {
+  display: block;
+  width: 100%;
+  padding: 8px 14px;
+  border: none;
+  background: none;
+  color: var(--foreground);
+  font-size: 0.8rem;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.linked-place-add-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-1);
+  align-items: center;
+  margin-top: var(--spacing-1);
+}
+
+.linked-place-add-form select,
+.linked-place-add-form input {
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--background);
+  color: var(--foreground);
+  font-size: 0.8rem;
+}
+
+.linked-place-add-form input[name='amount'] {
+  width: 100px;
+}
+
+.linked-place-add-form button {
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: var(--primary);
@@ -955,6 +1051,12 @@ main {
 
 .place-item-region {
   color: var(--muted-foreground);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.place-item-schedule {
+  color: var(--primary);
   font-size: 0.8rem;
   white-space: nowrap;
 }
