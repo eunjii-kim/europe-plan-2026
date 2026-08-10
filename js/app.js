@@ -933,6 +933,7 @@ async function main() {
     const openDayIds = hasRenderedScheduleOnce ? getOpenDayIds(dayListEl) : null;
     renderDayNav(dayNavEl, effectiveData);
     const linkedPlaceCategories = [...PLACE_CATEGORIES, ...latestCustomPlaceCategories.map((c) => c.name)];
+    const linkedPlaceRegions = [...tripRegions, ...latestCustomRegions.map((r) => r.name)];
     renderDayList(
       dayListEl,
       effectiveData,
@@ -943,6 +944,7 @@ async function main() {
       openDayIds,
       latestPlaces,
       linkedPlaceCategories,
+      linkedPlaceRegions,
     );
     hasRenderedScheduleOnce = true;
     plannedTotal = renderBudgetSummary(
@@ -1024,7 +1026,7 @@ async function main() {
     subscribeToCustomRegions((regions) => {
       latestCustomRegions = regions;
       refreshRegionSelects();
-      renderPlacesTab();
+      renderScheduleAndSummary();
     }, () => showFirebaseNotice());
     subscribeToCustomPlaceCategories((categories) => {
       latestCustomPlaceCategories = categories;
