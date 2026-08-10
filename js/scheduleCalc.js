@@ -21,8 +21,8 @@ export function buildScheduleBlockKey(dayId, blockIndex) {
  * (applyBudgetOverrides의 blockIndex 안정성 원칙과 동일)
  *
  * @param {Array} itineraryData
- * @param {Map<string, { time: string, title: string, note: string, attachments?: Array, deleted?: boolean }>} scheduleOverridesMap
- * @param {Map<string, Array<{ id: string, dayId: string, time: string, title: string, note: string, attachments?: Array }>>} [customBlocksByDay]
+ * @param {Map<string, { time: string, title: string, note: string, attachments?: Array, linkedPlaces?: Array, deleted?: boolean }>} scheduleOverridesMap
+ * @param {Map<string, Array<{ id: string, dayId: string, time: string, title: string, note: string, attachments?: Array, linkedPlaces?: Array }>>} [customBlocksByDay]
  * @returns {Array}
  */
 export function applyScheduleOverrides(itineraryData, scheduleOverridesMap, customBlocksByDay = new Map()) {
@@ -32,7 +32,7 @@ export function applyScheduleOverrides(itineraryData, scheduleOverridesMap, cust
         const blockKey = buildScheduleBlockKey(day.id, blockIndex);
         const override = scheduleOverridesMap.get(blockKey);
         if (!override) {
-          return { ...block, blockKey, overridden: false, attachments: [] };
+          return { ...block, blockKey, overridden: false, attachments: [], linkedPlaces: [] };
         }
         return {
           ...block,
@@ -40,6 +40,7 @@ export function applyScheduleOverrides(itineraryData, scheduleOverridesMap, cust
           title: override.title,
           note: override.note,
           attachments: override.attachments || [],
+          linkedPlaces: override.linkedPlaces || [],
           blockKey,
           overridden: true,
           deleted: Boolean(override.deleted),
@@ -53,6 +54,7 @@ export function applyScheduleOverrides(itineraryData, scheduleOverridesMap, cust
       title: custom.title,
       note: custom.note || '',
       attachments: custom.attachments || [],
+      linkedPlaces: custom.linkedPlaces || [],
       costItems: [],
       isCustom: true,
       customId: custom.id,
