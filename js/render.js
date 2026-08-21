@@ -1871,6 +1871,70 @@ document.addEventListener('click', (event) => {
 });
 
 /**
+ * 메모 카드를 클릭했을 때 전체 내용을 화면 중앙에 확대해서 보여주는 모달의 DOM(지연 생성 싱글턴).
+ * @type {{ modal: HTMLElement, title: HTMLElement, content: HTMLElement } | null}
+ */
+let memoDetailModalRefs = null;
+
+function closeMemoDetailModal() {
+  if (!memoDetailModalRefs) return;
+  memoDetailModalRefs.modal.hidden = true;
+}
+
+function ensureMemoDetailModal() {
+  if (memoDetailModalRefs) return memoDetailModalRefs;
+
+  const modal = document.createElement('div');
+  modal.className = 'memo-detail-modal';
+  modal.hidden = true;
+
+  const backdrop = document.createElement('div');
+  backdrop.className = 'memo-detail-backdrop';
+  backdrop.addEventListener('click', closeMemoDetailModal);
+
+  const card = document.createElement('div');
+  card.className = 'memo-detail-card';
+  card.setAttribute('role', 'dialog');
+  card.setAttribute('aria-modal', 'true');
+
+  const closeButton = document.createElement('button');
+  closeButton.type = 'button';
+  closeButton.className = 'memo-detail-close';
+  closeButton.innerHTML = ICONS.x;
+  closeButton.setAttribute('aria-label', '닫기');
+  closeButton.addEventListener('click', closeMemoDetailModal);
+
+  const title = document.createElement('h3');
+  title.className = 'memo-detail-title';
+
+  const content = document.createElement('p');
+  content.className = 'memo-detail-content';
+
+  card.append(closeButton, title, content);
+  modal.append(backdrop, card);
+  document.body.appendChild(modal);
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') closeMemoDetailModal();
+  });
+
+  memoDetailModalRefs = { modal, title, content };
+  return memoDetailModalRefs;
+}
+
+/**
+ * 메모 카드 클릭 시 전체 내용을 화면 중앙에 확대해서 보여준다.
+ * @param {{ title: string, content: string }} item
+ */
+function openMemoDetailModal(item) {
+  const refs = ensureMemoDetailModal();
+  refs.title.textContent = item.title;
+  refs.content.textContent = item.content || '';
+  refs.content.hidden = !item.content;
+  refs.modal.hidden = false;
+}
+
+/**
  * 저장된 메모를 수정하는 인라인 폼을 만든다. 줄바꿈이 가능한 textarea를 쓴다.
  * @param {{ title: string, content: string }} item
  * @param {(values: { title: string, content: string }) => void} onSave
@@ -1910,6 +1974,7 @@ function renderMemoEditForm(item, onSave, onCancel) {
 export function renderMemoList(listEl, items, onDelete, onEdit) {
   listEl.innerHTML = '';
   closeMemoActionsMenu();
+  closeMemoDetailModal();
   if (items.length === 0) {
     const empty = document.createElement('li');
     empty.className = 'memo-list-empty';
@@ -1995,6 +2060,12 @@ export function renderMemoList(listEl, items, onDelete, onEdit) {
     li.addEventListener('touchend', cancelLongPress);
     li.addEventListener('touchcancel', cancelLongPress);
     li.addEventListener('contextmenu', (event) => event.preventDefault());
+
+    li.addEventListener('click', (event) => {
+      if (isInteractiveTarget(event.target)) return;
+      if (!actionsEl.hidden || !editForm.hidden) return;
+      openMemoDetailModal(item);
+    });
 
     listEl.appendChild(li);
   }
