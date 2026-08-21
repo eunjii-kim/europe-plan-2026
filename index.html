@@ -27,6 +27,7 @@
     <button type="button" class="tab-button" data-tab="info" aria-selected="false">정보</button>
     <button type="button" class="tab-button" data-tab="expense" aria-selected="false">소비기록</button>
     <button type="button" class="tab-button" data-tab="checklist" aria-selected="false">체크리스트</button>
+    <button type="button" class="tab-button" data-tab="memo" aria-selected="false">메모</button>
   </nav>
 
   <main>
@@ -138,6 +139,23 @@
       </form>
 
       <div id="checklistSectionList" class="checklist-section-list"></div>
+    </section>
+
+    <section id="memoTab" class="tab-panel" hidden>
+      <p class="hint">자유롭게 메모를 남기면 다른 기기와 실시간으로 공유됩니다.</p>
+      <p class="firebase-notice" hidden></p>
+
+      <button type="button" id="memoAddToggle" class="toolbar-button">+ 글쓰기</button>
+      <form id="memoForm" class="memo-form" hidden>
+        <input id="memoTitleInput" type="text" placeholder="제목" required maxlength="100" />
+        <textarea id="memoContentInput" placeholder="내용을 입력하세요" maxlength="5000"></textarea>
+        <div class="memo-form-actions">
+          <button type="submit">저장</button>
+          <button type="button" id="memoCancelButton">취소</button>
+        </div>
+      </form>
+
+      <ul id="memoList" class="memo-list"></ul>
     </section>
   </main>
 
