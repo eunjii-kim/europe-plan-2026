@@ -2,7 +2,6 @@ import { itineraryData } from './data.js';
 import {
   TRIP_INFO,
   THEME_STORAGE_KEY,
-  EDIT_MODE_STORAGE_KEY,
   EXCHANGE_RATE_REFRESH_INTERVAL_MS,
   ICONS,
   EXCLUDED_REGIONS,
@@ -149,31 +148,6 @@ function setupThemeToggle() {
   });
 }
 
-/** 현재 편집모드가 켜져 있는지 확인한다. */
-function isEditModeOn() {
-  return document.body.classList.contains('edit-mode');
-}
-
-/**
- * 편집모드 토글 버튼을 연결한다. 선택값은 localStorage에 저장해 다음 방문에도 유지한다.
- * @param {() => void} onToggle - 켜짐/꺼짐이 바뀔 때마다 화면을 다시 그리기 위한 콜백
- */
-function setupEditModeToggle(onToggle) {
-  const button = document.getElementById('editModeToggle');
-  const stored = localStorage.getItem(EDIT_MODE_STORAGE_KEY) === 'on';
-  document.body.classList.toggle('edit-mode', stored);
-  button.innerHTML = stored ? ICONS.wrench : ICONS.pencil;
-  button.setAttribute('aria-pressed', String(stored));
-
-  button.addEventListener('click', () => {
-    const next = !isEditModeOn();
-    document.body.classList.toggle('edit-mode', next);
-    localStorage.setItem(EDIT_MODE_STORAGE_KEY, next ? 'on' : 'off');
-    button.innerHTML = next ? ICONS.wrench : ICONS.pencil;
-    button.setAttribute('aria-pressed', String(next));
-    onToggle();
-  });
-}
 
 /**
  * select 요소에 옵션 목록 + "+ 새 항목 추가" 옵션을 채우는 공용 헬퍼.
@@ -1078,7 +1052,6 @@ async function main() {
       rates,
       todayDayId,
       handlers,
-      isEditModeOn(),
       openDayIds,
       latestPlaces,
       linkedPlaceCategories,
@@ -1122,8 +1095,6 @@ async function main() {
     renderCustomBudgetList(latestBudgetItems);
   }
   setInterval(refreshRates, EXCHANGE_RATE_REFRESH_INTERVAL_MS);
-
-  setupEditModeToggle(renderScheduleAndSummary);
 
   // Firestore 연결 여부와 상관없이 일정/예산 요약은 항상 먼저 보여준다.
   renderScheduleAndSummary();
