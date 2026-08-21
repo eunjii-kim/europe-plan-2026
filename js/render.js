@@ -225,15 +225,62 @@ function renderTimeBlockEditForm(block, onSave, onCancel) {
   return form;
 }
 
+/** 하루의 분 단위 총량. 시간 계산이 자정을 넘지 않도록 clamp할 때 쓴다. */
+const MINUTES_PER_DAY = 24 * 60;
+
+/** 앞/뒤 일정이 없을 때 새 일정을 몇 분 떨어뜨려 제안할지 */
+const DEFAULT_TIME_GAP_MINUTES = 30;
+
 /**
- * 일정 블록을 길게 눌렀을 때 뜨는 액션 메뉴(수정/정보 추가/되돌리기/삭제)를 만든다.
- * 편집모드를 켜지 않아도 바로 쓸 수 있고, 정보/메모 탭의 길게 누르기 메뉴와 동작이 같다.
+ * 'HH:MM' 문자열을 자정 기준 분으로 바꾼다. 형식이 아니면 null.
+ * @param {string} time
+ * @returns {number | null}
+ */
+function parseTimeToMinutes(time) {
+  const match = /^(\d{1,2}):(\d{2})$/.exec((time || '').trim());
+  if (!match) return null;
+  const minutes = Number(match[1]) * 60 + Number(match[2]);
+  return Number.isFinite(minutes) ? minutes : null;
+}
+
+/**
+ * 자정 기준 분을 'HH:MM' 문자열로 바꾼다.
+ * @param {number} minutes
+ * @returns {string}
+ */
+function formatMinutesToTime(minutes) {
+  const clamped = Math.max(0, Math.min(MINUTES_PER_DAY - 1, Math.round(minutes)));
+  return `${String(Math.floor(clamped / 60)).padStart(2, '0')}:${String(clamped % 60).padStart(2, '0')}`;
+}
+
+/**
+ * 어떤 일정의 바로 위/아래에 끼워 넣을 새 일정의 시간을 제안한다.
+ * 일정은 시간순으로 정렬되므로, 이웃 일정과의 중간 시각을 제안하면 원하는 자리에 들어간다.
+ * @param {string} baseTime - 기준이 되는 일정의 시간
+ * @param {string | undefined} neighborTime - 위/아래에 있는 이웃 일정의 시간 (없으면 undefined)
+ * @param {'before' | 'after'} position
+ * @returns {string} 제안 시간. 시간 형식을 알 수 없으면 기준 시간을 그대로 돌려준다.
+ */
+function suggestNeighborTime(baseTime, neighborTime, position) {
+  const base = parseTimeToMinutes(baseTime);
+  if (base === null) return baseTime;
+  const neighbor = parseTimeToMinutes(neighborTime);
+  if (neighbor === null) {
+    return formatMinutesToTime(position === 'before' ? base - DEFAULT_TIME_GAP_MINUTES : base + DEFAULT_TIME_GAP_MINUTES);
+  }
+  return formatMinutesToTime((base + neighbor) / 2);
+}
+
+/**
+ * 일정 블록을 길게 눌렀을 때 뜨는 액션 메뉴(수정/위·아래 일정 추가/정보 추가/되돌리기/삭제)를 만든다.
+ * 정보/메모 탭의 길게 누르기 메뉴와 동작이 같다.
  * @param {object} block
  * @param {object} handlers
  * @param {() => void} onAddInfo - "정보 추가"를 골랐을 때 실행할 동작
+ * @param {(position: 'before' | 'after') => void} onInsertBlock - "위/아래에 일정 추가"를 골랐을 때 실행할 동작
  * @returns {HTMLElement}
  */
-function renderTimeBlockActionMenu(block, handlers, onAddInfo) {
+function renderTimeBlockActionMenu(block, handlers, onAddInfo, onInsertBlock) {
   const menu = document.createElement('div');
   menu.className = 'time-block-action-menu';
   menu.hidden = true;
@@ -251,6 +298,20 @@ function renderTimeBlockActionMenu(block, handlers, onAddInfo) {
     createButton(`${ICONS.pencil} 수정`, '', () => {
       closeTimeBlockActionMenu();
       handlers.onStartEditBlock(block.blockKey || block.customId);
+    }),
+  );
+
+  menu.appendChild(
+    createButton('⬆️ 위에 일정 추가', '', () => {
+      closeTimeBlockActionMenu();
+      onInsertBlock('before');
+    }),
+  );
+
+  menu.appendChild(
+    createButton('⬇️ 아래에 일정 추가', '', () => {
+      closeTimeBlockActionMenu();
+      onInsertBlock('after');
     }),
   );
 
@@ -306,13 +367,12 @@ function safeHostname(url) {
 }
 
 /**
- * 일정 블록의 이미지/링크 첨부 목록과, 편집모드일 때의 첨부 추가 폼을 만든다.
+ * 일정 블록의 이미지/링크 첨부 목록과 첨부 추가 폼을 만든다. 각 첨부는 ×로 바로 삭제할 수 있다.
  * @param {{ attachments?: Array<{ type: string, url: string, label?: string }> }} block
  * @param {object} handlers
- * @param {boolean} editMode
  * @returns {HTMLElement}
  */
-function renderAttachmentsSection(block, handlers, editMode) {
+function renderAttachmentsSection(block, handlers) {
   const wrapper = document.createElement('div');
   wrapper.className = 'attachment-section';
 
@@ -341,47 +401,46 @@ function renderAttachmentsSection(block, handlers, editMode) {
         li.appendChild(link);
       }
 
-      if (editMode) {
-        const removeButton = document.createElement('button');
-        removeButton.type = 'button';
-        removeButton.className = 'attachment-remove-button';
-        removeButton.innerHTML = ICONS.x;
-        removeButton.setAttribute('aria-label', '첨부 삭제');
-        removeButton.addEventListener('click', () => handlers.onRemoveAttachment(block, index));
-        li.appendChild(removeButton);
-      }
+      const removeButton = document.createElement('button');
+      removeButton.type = 'button';
+      removeButton.className = 'attachment-remove-button';
+      removeButton.innerHTML = ICONS.x;
+      removeButton.setAttribute('aria-label', '첨부 삭제');
+      removeButton.addEventListener('click', () => {
+        if (!window.confirm('이 첨부를 삭제할까요?')) return;
+        handlers.onRemoveAttachment(block, index);
+      });
+      li.appendChild(removeButton);
 
       list.appendChild(li);
     });
     wrapper.appendChild(list);
   }
 
-  if (editMode) {
-    const form = document.createElement('form');
-    form.className = 'attachment-add-form';
-    form.innerHTML = `
-      <select name="type" aria-label="첨부 종류">
-        <option value="image">이미지</option>
-        <option value="link">링크</option>
-      </select>
-      <input type="url" name="url" placeholder="https://..." aria-label="URL" required />
-      <input type="text" name="label" placeholder="이름 (선택)" aria-label="이름" />
-      <button type="submit">첨부 추가</button>
-    `;
-    form.addEventListener('submit', (event) => {
-      event.preventDefault();
-      const data = new FormData(form);
-      const url = data.get('url').trim();
-      if (!url) return;
-      handlers.onAddAttachment(block, {
-        type: data.get('type'),
-        url,
-        label: data.get('label').trim(),
-      });
-      form.reset();
+  const form = document.createElement('form');
+  form.className = 'attachment-add-form';
+  form.innerHTML = `
+    <select name="type" aria-label="첨부 종류">
+      <option value="image">이미지</option>
+      <option value="link">링크</option>
+    </select>
+    <input type="url" name="url" placeholder="https://..." aria-label="URL" required />
+    <input type="text" name="label" placeholder="이름 (선택)" aria-label="이름" />
+    <button type="submit">첨부 추가</button>
+  `;
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const data = new FormData(form);
+    const url = data.get('url').trim();
+    if (!url) return;
+    handlers.onAddAttachment(block, {
+      type: data.get('type'),
+      url,
+      label: data.get('label').trim(),
     });
-    wrapper.appendChild(form);
-  }
+    form.reset();
+  });
+  wrapper.appendChild(form);
 
   return wrapper;
 }
@@ -531,27 +590,76 @@ function renderLinkedPlaceAddForm(places, placeCategories, placeRegions, onAdd) 
 }
 
 /**
+ * 어떤 일정의 위/아래에 새 일정을 끼워 넣는 인라인 폼을 만든다.
+ * 제안 시간이 미리 채워진 채로 열리며, 그대로 저장하면 원하는 자리에 들어간다.
+ * @param {(values: { time: string, title: string, note: string }) => void} onAdd
+ * @returns {HTMLFormElement & { openWith: (time: string) => void }}
+ */
+function renderInsertBlockForm(onAdd) {
+  const form = document.createElement('form');
+  form.className = 'time-block-insert-form';
+  form.hidden = true;
+  form.innerHTML = `
+    <input type="text" name="time" placeholder="시간 (예: 09:00)" aria-label="시간" required />
+    <input type="text" name="title" placeholder="제목" aria-label="제목" required />
+    <textarea name="note" placeholder="메모 (선택)" aria-label="메모"></textarea>
+    <div class="time-block-insert-form-actions">
+      <button type="submit">추가</button>
+      <button type="button" class="time-block-insert-cancel-button">취소</button>
+    </div>
+  `;
+
+  const close = () => {
+    form.reset();
+    form.hidden = true;
+  };
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const data = new FormData(form);
+    const title = data.get('title').trim();
+    if (!title) return;
+    onAdd({ time: data.get('time').trim(), title, note: data.get('note').trim() });
+    close();
+  });
+  form.querySelector('.time-block-insert-cancel-button').addEventListener('click', close);
+
+  form.openWith = (time) => {
+    form.reset();
+    form.elements.time.value = time;
+    form.hidden = false;
+    form.elements.title.focus();
+  };
+
+  return form;
+}
+
+/**
  * timeBlock 하나의 DOM 요소를 만든다.
  * @param {object} block
  * @param {{ CHF: number, EUR: number }} rates
  * @param {object} handlers
- * @param {boolean} editMode
- * @param {Array<{ id: string, category: string, title: string, region: string }>} [places] - "정보 추가" 메뉴에서 고를 수 있는 장소 목록
- * @param {string[]} [placeCategories] - "정보 추가" 메뉴의 대분류 목록
- * @param {string[]} [placeRegions] - "정보 추가" 메뉴의 지역 필터 목록
- * @param {string | null} [editingBlockId] - 현재 인라인 편집 중인 블록의 blockKey 또는 customId
+ * @param {{
+ *   dayId: string,
+ *   prevTime?: string,
+ *   nextTime?: string,
+ *   places?: Array<{ id: string, category: string, title: string, region: string }>,
+ *   placeCategories?: string[],
+ *   placeRegions?: string[],
+ *   editingBlockId?: string | null,
+ * }} context - 날짜/이웃 일정 시간과 "정보 추가" 메뉴에 필요한 목록들
  * @returns {HTMLElement}
  */
-function renderTimeBlock(
-  block,
-  rates,
-  handlers,
-  editMode,
-  places = [],
-  placeCategories = [],
-  placeRegions = [],
-  editingBlockId = null,
-) {
+function renderTimeBlock(block, rates, handlers, context) {
+  const {
+    dayId,
+    prevTime,
+    nextTime,
+    places = [],
+    placeCategories = [],
+    placeRegions = [],
+    editingBlockId = null,
+  } = context;
   const wrapper = document.createElement('div');
   wrapper.className = 'time-block';
 
@@ -604,11 +712,25 @@ function renderTimeBlock(
     handlers.onAddLinkedPlace(block, { id: crypto.randomUUID(), ...values });
   });
 
-  const actionMenu = renderTimeBlockActionMenu(block, handlers, () => {
-    linkedPlaceForm.hidden = false;
-  });
+  const insertBlockForm = renderInsertBlockForm((values) => handlers.onAddBlock(dayId, values));
+
+  const actionMenu = renderTimeBlockActionMenu(
+    block,
+    handlers,
+    () => {
+      insertBlockForm.hidden = true;
+      linkedPlaceForm.hidden = false;
+    },
+    (position) => {
+      linkedPlaceForm.hidden = true;
+      insertBlockForm.openWith(
+        suggestNeighborTime(block.time, position === 'before' ? prevTime : nextTime, position),
+      );
+    },
+  );
   wrapper.appendChild(actionMenu);
   wrapper.appendChild(linkedPlaceForm);
+  wrapper.appendChild(insertBlockForm);
 
   let longPressTimer = null;
   const startLongPress = (event) => {
@@ -633,9 +755,7 @@ function renderTimeBlock(
   wrapper.addEventListener('touchcancel', cancelLongPress);
   wrapper.addEventListener('contextmenu', (event) => event.preventDefault());
 
-  const hasAttachments = Boolean(block.attachments && block.attachments.length > 0);
-  const hasMore = Boolean(block.note) || (block.costItems && block.costItems.length > 0) || hasAttachments || editMode;
-  if (hasMore) {
+  {
     const more = document.createElement('details');
     more.className = 'time-block-more';
     const summary = document.createElement('summary');
@@ -649,9 +769,7 @@ function renderTimeBlock(
       more.appendChild(note);
     }
 
-    if (hasAttachments || editMode) {
-      more.appendChild(renderAttachmentsSection(block, handlers, editMode));
-    }
+    more.appendChild(renderAttachmentsSection(block, handlers));
 
     if (block.costItems && block.costItems.length > 0) {
       const costList = document.createElement('ul');
@@ -706,11 +824,9 @@ function renderTimeBlock(
       more.appendChild(costList);
     }
 
-    if (editMode) {
-      const anchorKey = block.blockKey || block.customId;
-      if (anchorKey) {
-        more.appendChild(renderAddCostItemForm((values) => handlers.onAddCostItem(anchorKey, values)));
-      }
+    const anchorKey = block.blockKey || block.customId;
+    if (anchorKey) {
+      more.appendChild(renderAddCostItemForm((values) => handlers.onAddCostItem(anchorKey, values)));
     }
 
     wrapper.appendChild(more);
@@ -781,7 +897,6 @@ function renderAddBlockSection(dayId, onAdd) {
  * @param {{ CHF: number, EUR: number }} rates
  * @param {string | null} todayDayId - 오늘 날짜와 일치하는 day.id (없으면 null)
  * @param {object} handlers - 비용/일정 편집 관련 핸들러 모음
- * @param {boolean} editMode
  * @param {Set<string> | null} [openDayIds] - 이전 렌더링에서 열려있던 day.id 목록. 주어지면 이 상태를 그대로 복원하고,
  *   없으면(최초 렌더링) todayDayId/첫 번째 카드를 여는 기본 로직을 쓴다.
  * @param {Array<{ id: string, category: string, title: string, region: string }>} [places] - "정보 추가" 메뉴에서 고를 수 있는 장소 목록
@@ -795,7 +910,6 @@ export function renderDayList(
   rates,
   todayDayId,
   handlers,
-  editMode,
   openDayIds = null,
   places = [],
   placeCategories = [],
@@ -824,16 +938,21 @@ export function renderDayList(
 
     const blockList = document.createElement('div');
     blockList.className = 'time-block-list';
-    for (const block of day.timeBlocks) {
+    day.timeBlocks.forEach((block, blockIndex) => {
       blockList.appendChild(
-        renderTimeBlock(block, rates, handlers, editMode, places, placeCategories, placeRegions, editingBlockId),
+        renderTimeBlock(block, rates, handlers, {
+          dayId: day.id,
+          prevTime: day.timeBlocks[blockIndex - 1]?.time,
+          nextTime: day.timeBlocks[blockIndex + 1]?.time,
+          places,
+          placeCategories,
+          placeRegions,
+          editingBlockId,
+        }),
       );
-    }
+    });
     card.appendChild(blockList);
-
-    if (editMode) {
-      card.appendChild(renderAddBlockSection(day.id, handlers.onAddBlock));
-    }
+    card.appendChild(renderAddBlockSection(day.id, handlers.onAddBlock));
 
     listEl.appendChild(card);
   });
