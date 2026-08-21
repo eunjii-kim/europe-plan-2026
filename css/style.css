@@ -203,6 +203,8 @@ main {
   max-width: var(--max-width);
   margin: 0 auto;
   padding: var(--spacing-4);
+  /* 모바일 키보드가 떠도 화면이 항상 스크롤될 만큼 아래 여유를 남긴다(모든 탭 공통). */
+  padding-bottom: 30vh;
 }
 
 .schedule-toolbar {
@@ -1027,6 +1029,7 @@ main {
   padding: var(--spacing-2);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
+  cursor: pointer;
   -webkit-touch-callout: none;
   user-select: none;
 }
@@ -1249,9 +1252,12 @@ main {
   gap: var(--spacing-1);
   align-items: center;
   flex: 1 1 100%;
-  margin-top: var(--spacing-1);
-  padding-top: var(--spacing-1);
-  border-top: 1px dashed var(--border);
+}
+
+.place-edit-form input,
+.place-edit-form select,
+.place-edit-form textarea {
+  scroll-margin-top: 60px;
 }
 
 .place-edit-form input,
@@ -1275,7 +1281,15 @@ main {
   resize: vertical;
 }
 
-.place-edit-form button {
+.place-edit-form-actions,
+.expense-edit-form-actions {
+  display: flex;
+  gap: var(--spacing-1);
+  flex: 1 1 100%;
+}
+
+.place-edit-form button,
+.expense-edit-form button {
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: var(--primary);
@@ -1283,6 +1297,12 @@ main {
   font-size: 0.75rem;
   padding: 4px 10px;
   cursor: pointer;
+}
+
+.place-edit-form button[type='button'],
+.expense-edit-form button[type='button'] {
+  background: var(--card);
+  color: var(--foreground);
 }
 
 .place-list-empty,
@@ -1429,9 +1449,6 @@ main {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-1);
-  margin-top: var(--spacing-2);
-  padding-top: var(--spacing-2);
-  border-top: 1px dashed var(--border);
 }
 
 .memo-edit-form input,
@@ -1585,16 +1602,7 @@ main {
   background: var(--background);
   color: var(--foreground);
   font-size: 0.8rem;
-}
-
-.expense-edit-form button {
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: var(--primary);
-  color: var(--primary-foreground);
-  font-size: 0.75rem;
-  padding: 4px 10px;
-  cursor: pointer;
+  scroll-margin-top: 60px;
 }
 
 .expense-stats {
@@ -1820,7 +1828,7 @@ main {
   flex-wrap: wrap;
   gap: var(--spacing-1);
   align-items: center;
-  margin-top: var(--spacing-1);
+  flex: 1 1 100%;
 }
 
 .checklist-section-title-edit-form input {
@@ -1842,6 +1850,11 @@ main {
   font-size: 0.75rem;
   padding: 4px 10px;
   cursor: pointer;
+}
+
+.checklist-section-title-edit-form button[type='button'] {
+  background: var(--card);
+  color: var(--foreground);
 }
 
 .checklist-section-actions {

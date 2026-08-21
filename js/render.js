@@ -1113,9 +1113,10 @@ export function renderPlaceFilters(
  * @param {string[]} categories - 고정 분류 + 사용자가 추가한 커스텀 분류 병합 목록
  * @param {string[]} regions - 지역 select에 채울 옵션 목록
  * @param {(values: { category: string, title: string, region: string, link: string, memo: string }) => void} onSave
+ * @param {() => void} onCancel
  * @returns {HTMLFormElement}
  */
-function renderPlaceEditForm(item, categories, regions, onSave) {
+function renderPlaceEditForm(item, categories, regions, onSave, onCancel) {
   const form = document.createElement('form');
   form.className = 'place-edit-form';
   const categoryOptions = categories
@@ -1138,7 +1139,10 @@ function renderPlaceEditForm(item, categories, regions, onSave) {
     </select>
     <input type="url" name="link" value="${escapeHtml(item.link || '')}" placeholder="링크" aria-label="링크" />
     <textarea name="memo" placeholder="메모" aria-label="메모" maxlength="200">${escapeHtml(item.memo || '')}</textarea>
-    <button type="submit">저장</button>
+    <div class="place-edit-form-actions">
+      <button type="submit">저장</button>
+      <button type="button" class="place-edit-cancel-button">취소</button>
+    </div>
   `;
   form.addEventListener('submit', (event) => {
     event.preventDefault();
@@ -1151,6 +1155,7 @@ function renderPlaceEditForm(item, categories, regions, onSave) {
       memo: data.get('memo').trim(),
     });
   });
+  form.querySelector('.place-edit-cancel-button').addEventListener('click', () => onCancel());
   return form;
 }
 
@@ -1161,11 +1166,16 @@ function renderPlaceEditForm(item, categories, regions, onSave) {
  * @param {string[]} categories - 고정 분류 + 사용자가 추가한 커스텀 분류 병합 목록
  * @param {string[]} regions - 수정 폼의 지역 select에 채울 옵션 목록
  * @param {Map<string, string[]>} placeScheduleDates - 장소 id별로 일정에 연결된 날짜(MM/DD) 목록
- * @param {(id: string) => void} onDelete
- * @param {(id: string, values: object) => void} onEdit
- * @param {(id: string, favorite: boolean) => void} onToggleFavorite
+ * @param {string | null} editingId - 현재 인라인 편집 중인 장소 id (없으면 null)
+ * @param {{
+ *   onDelete: (id: string) => void,
+ *   onSave: (id: string, values: object) => void,
+ *   onStartEdit: (id: string) => void,
+ *   onCancelEdit: () => void,
+ *   onToggleFavorite: (id: string, favorite: boolean) => void,
+ * }} handlers
  */
-export function renderPlaceList(listEl, items, categories, regions, placeScheduleDates, onDelete, onEdit, onToggleFavorite) {
+export function renderPlaceList(listEl, items, categories, regions, placeScheduleDates, editingId, handlers) {
   listEl.innerHTML = '';
   closePlaceActionsMenu();
   closePlaceDetailModal();
@@ -1179,6 +1189,21 @@ export function renderPlaceList(listEl, items, categories, regions, placeSchedul
   for (const item of items) {
     const li = document.createElement('li');
     li.className = 'place-list-item';
+
+    if (item.id === editingId) {
+      li.appendChild(
+        renderPlaceEditForm(
+          item,
+          categories,
+          regions,
+          (values) => handlers.onSave(item.id, values),
+          () => handlers.onCancelEdit(),
+        ),
+      );
+      listEl.appendChild(li);
+      continue;
+    }
+
     const icon = PLACE_CATEGORY_ICONS[item.category] || '';
     const regionTag = item.region ? `<span class="place-item-region">📍 ${escapeHtml(item.region)}</span>` : '';
     const scheduleDates = placeScheduleDates.get(item.id);
@@ -1223,19 +1248,13 @@ export function renderPlaceList(listEl, items, categories, regions, placeSchedul
     mapLink.textContent = '🗺️ 지도에서 보기';
     li.appendChild(mapLink);
 
-    const editForm = renderPlaceEditForm(item, categories, regions, (values) => {
-      onEdit(item.id, values);
-      editForm.hidden = true;
-    });
-    editForm.hidden = true;
-
     const favoriteButton = document.createElement('button');
     favoriteButton.type = 'button';
     favoriteButton.className = 'place-item-favorite';
     favoriteButton.classList.toggle('is-active', !!item.favorite);
     favoriteButton.innerHTML = item.favorite ? ICONS.starFilled : ICONS.star;
     favoriteButton.setAttribute('aria-label', item.favorite ? '즐겨찾기 해제' : '즐겨찾기 추가');
-    favoriteButton.addEventListener('click', () => onToggleFavorite(item.id, !item.favorite));
+    favoriteButton.addEventListener('click', () => handlers.onToggleFavorite(item.id, !item.favorite));
     li.appendChild(favoriteButton);
 
     const actionsEl = document.createElement('div');
@@ -1248,7 +1267,7 @@ export function renderPlaceList(listEl, items, categories, regions, placeSchedul
     editActionButton.innerHTML = `${ICONS.pencil} 수정`;
     editActionButton.addEventListener('click', () => {
       closePlaceActionsMenu();
-      editForm.hidden = false;
+      handlers.onStartEdit(item.id);
     });
 
     const deleteActionButton = document.createElement('button');
@@ -1258,12 +1277,11 @@ export function renderPlaceList(listEl, items, categories, regions, placeSchedul
     deleteActionButton.addEventListener('click', () => {
       closePlaceActionsMenu();
       if (!window.confirm(`"${item.title}" 항목을 삭제할까요?`)) return;
-      onDelete(item.id);
+      handlers.onDelete(item.id);
     });
 
     actionsEl.append(editActionButton, deleteActionButton);
     li.appendChild(actionsEl);
-    li.appendChild(editForm);
 
     let longPressTimer = null;
 
@@ -1292,7 +1310,7 @@ export function renderPlaceList(listEl, items, categories, regions, placeSchedul
 
     li.addEventListener('click', (event) => {
       if (isInteractiveTarget(event.target)) return;
-      if (!actionsEl.hidden || !editForm.hidden) return;
+      if (!actionsEl.hidden) return;
       openPlaceDetailModal(item);
     });
 
@@ -1309,9 +1327,10 @@ const DEFAULT_COUNTRY_FLAG = '🌍';
  * @param {{ date: string, category: string, title: string, region: string, amount: number, currency: string, headcount: number }} item
  * @param {string[]} regions - 지역 select에 채울 옵션 목록
  * @param {(values: object) => void} onSave
+ * @param {() => void} onCancel
  * @returns {HTMLFormElement}
  */
-function renderExpenseEditForm(item, regions, onSave) {
+function renderExpenseEditForm(item, regions, onSave, onCancel) {
   const form = document.createElement('form');
   form.className = 'expense-edit-form';
   const categoryOptions = EXPENSE_CATEGORIES
@@ -1338,7 +1357,10 @@ function renderExpenseEditForm(item, regions, onSave) {
       <option value="CHF" ${item.currency === 'CHF' ? 'selected' : ''}>CHF</option>
     </select>
     <input type="number" name="headcount" value="${item.headcount || 1}" placeholder="1(인원)" min="1" step="1" aria-label="인원" />
-    <button type="submit">저장</button>
+    <div class="expense-edit-form-actions">
+      <button type="submit">저장</button>
+      <button type="button" class="expense-edit-cancel-button">취소</button>
+    </div>
   `;
   form.addEventListener('submit', (event) => {
     event.preventDefault();
@@ -1353,6 +1375,7 @@ function renderExpenseEditForm(item, regions, onSave) {
       headcount: Number(data.get('headcount')) || 1,
     });
   });
+  form.querySelector('.expense-edit-cancel-button').addEventListener('click', () => onCancel());
   return form;
 }
 
@@ -1361,11 +1384,16 @@ function renderExpenseEditForm(item, regions, onSave) {
  * @param {HTMLElement} listEl - <table>을 담을 컨테이너(가로 스크롤 래퍼)
  * @param {Array<{ id: string, date: string, category: string, title: string, region: string, amount: number, currency: string, headcount: number }>} items
  * @param {{ CHF: number, EUR: number }} rates
- * @param {(id: string) => void} onDelete
- * @param {(id: string, values: object) => void} onEdit
  * @param {string[]} regions - 수정 폼의 지역 select에 채울 옵션 목록
+ * @param {string | null} editingId - 현재 인라인 편집 중인 지출 id (없으면 null)
+ * @param {{
+ *   onDelete: (id: string) => void,
+ *   onSave: (id: string, values: object) => void,
+ *   onStartEdit: (id: string) => void,
+ *   onCancelEdit: () => void,
+ * }} handlers
  */
-export function renderExpenseList(listEl, items, rates, onDelete, onEdit, regions) {
+export function renderExpenseList(listEl, items, rates, regions, editingId, handlers) {
   listEl.innerHTML = '';
   if (items.length === 0) {
     const empty = document.createElement('p');
@@ -1396,6 +1424,24 @@ export function renderExpenseList(listEl, items, rates, onDelete, onEdit, region
   const tbody = document.createElement('tbody');
 
   for (const item of items) {
+    if (item.id === editingId) {
+      const editRow = document.createElement('tr');
+      editRow.className = 'expense-edit-row';
+      const editRowCell = document.createElement('td');
+      editRowCell.colSpan = 10;
+      editRowCell.appendChild(
+        renderExpenseEditForm(
+          item,
+          regions,
+          (values) => handlers.onSave(item.id, values),
+          () => handlers.onCancelEdit(),
+        ),
+      );
+      editRow.appendChild(editRowCell);
+      tbody.appendChild(editRow);
+      continue;
+    }
+
     const icon = EXPENSE_CATEGORY_ICONS[item.category] || DEFAULT_EXPENSE_CATEGORY_ICON;
     const krwLabel = item.currency === 'KRW' ? '' : ` (${formatKrw(convertToKrw(item.amount, item.currency, rates))})`;
 
@@ -1413,26 +1459,12 @@ export function renderExpenseList(listEl, items, rates, onDelete, onEdit, region
       <td></td>
     `;
 
-    const editRow = document.createElement('tr');
-    editRow.className = 'expense-edit-row';
-    editRow.hidden = true;
-    const editRowCell = document.createElement('td');
-    editRowCell.colSpan = 10;
-    const editForm = renderExpenseEditForm(item, regions, (values) => {
-      onEdit(item.id, values);
-      editRow.hidden = true;
-    });
-    editRowCell.appendChild(editForm);
-    editRow.appendChild(editRowCell);
-
     const editButton = document.createElement('button');
     editButton.type = 'button';
     editButton.className = 'expense-item-edit';
     editButton.innerHTML = ICONS.pencil;
     editButton.setAttribute('aria-label', '수정');
-    editButton.addEventListener('click', () => {
-      editRow.hidden = !editRow.hidden;
-    });
+    editButton.addEventListener('click', () => handlers.onStartEdit(item.id));
     row.children[8].appendChild(editButton);
 
     const deleteButton = document.createElement('button');
@@ -1440,11 +1472,14 @@ export function renderExpenseList(listEl, items, rates, onDelete, onEdit, region
     deleteButton.className = 'expense-item-delete';
     deleteButton.innerHTML = ICONS.x;
     deleteButton.setAttribute('aria-label', '삭제');
-    deleteButton.addEventListener('click', () => onDelete(item.id));
+    deleteButton.addEventListener('click', () => {
+      const label = item.title || `${item.date} ${item.category}`;
+      if (!window.confirm(`"${label}" 지출 기록을 삭제할까요?`)) return;
+      handlers.onDelete(item.id);
+    });
     row.children[9].appendChild(deleteButton);
 
     tbody.appendChild(row);
-    tbody.appendChild(editRow);
   }
 
   table.appendChild(tbody);
@@ -1579,38 +1614,60 @@ function createChecklistItemAddControls(onAdd) {
 }
 
 /**
- * 섹션 제목을 수정하는 인라인 토글(연필 버튼 + 폼)을 만든다.
+ * 섹션 제목을 그 자리에서 바로 고칠 수 있는 인라인 편집(제목 + 연필 버튼 + 폼)을 만든다.
+ * 편집을 시작하면 제목/연필이 숨고 같은 자리에 입력칸이 나타난다(별도 영역이 아래에 생기지 않음).
  * @param {{ id: string, title: string }} section
  * @param {(sectionId: string, title: string) => void} onEditSectionTitle
- * @returns {{ editButton: HTMLButtonElement, editForm: HTMLFormElement }}
+ * @returns {{ titleEl: HTMLElement, editButton: HTMLButtonElement, editForm: HTMLFormElement }}
  */
 function createChecklistSectionTitleEdit(section, onEditSectionTitle) {
-  const editForm = document.createElement('form');
-  editForm.className = 'checklist-section-title-edit-form';
-  editForm.hidden = true;
-  editForm.innerHTML = `
-    <input type="text" name="title" value="${escapeHtml(section.title)}" maxlength="50" required aria-label="섹션 이름 수정" />
-    <button type="submit">저장</button>
-  `;
-  editForm.addEventListener('submit', (event) => {
-    event.preventDefault();
-    const data = new FormData(editForm);
-    const title = data.get('title').trim();
-    if (!title) return;
-    onEditSectionTitle(section.id, title);
-    editForm.hidden = true;
-  });
+  const titleEl = document.createElement('h3');
+  titleEl.className = 'checklist-section-title';
+  titleEl.textContent = section.title;
 
   const editButton = document.createElement('button');
   editButton.type = 'button';
   editButton.className = 'checklist-section-edit';
   editButton.innerHTML = ICONS.pencil;
   editButton.setAttribute('aria-label', '섹션 이름 수정');
+
+  const editForm = document.createElement('form');
+  editForm.className = 'checklist-section-title-edit-form';
+  editForm.hidden = true;
+  editForm.innerHTML = `
+    <input type="text" name="title" value="${escapeHtml(section.title)}" maxlength="50" required aria-label="섹션 이름 수정" />
+    <button type="submit">저장</button>
+    <button type="button" class="checklist-section-title-cancel-button">취소</button>
+  `;
+
+  const closeEdit = () => {
+    editForm.hidden = true;
+    titleEl.hidden = false;
+    editButton.hidden = false;
+  };
+
   editButton.addEventListener('click', () => {
-    editForm.hidden = !editForm.hidden;
+    titleEl.hidden = true;
+    editButton.hidden = true;
+    editForm.hidden = false;
+    editForm.elements.title.focus();
   });
 
-  return { editButton, editForm };
+  editForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const data = new FormData(editForm);
+    const title = data.get('title').trim();
+    if (!title) return;
+    onEditSectionTitle(section.id, title);
+    closeEdit();
+  });
+
+  editForm.querySelector('.checklist-section-title-cancel-button').addEventListener('click', () => {
+    editForm.elements.title.value = section.title;
+    closeEdit();
+  });
+
+  return { titleEl, editButton, editForm };
 }
 
 /**
@@ -1658,16 +1715,13 @@ export function renderChecklistSections(listEl, sections, itemsBySectionId, edit
 
     const titleGroup = document.createElement('div');
     titleGroup.className = 'checklist-section-title-group';
-    const titleEl = document.createElement('h3');
-    titleEl.className = 'checklist-section-title';
-    titleEl.textContent = section.title;
-    titleGroup.appendChild(titleEl);
 
-    const { editButton: sectionEditButton, editForm: sectionEditForm } = createChecklistSectionTitleEdit(
-      section,
-      handlers.onEditSectionTitle,
-    );
-    titleGroup.appendChild(sectionEditButton);
+    const {
+      titleEl,
+      editButton: sectionEditButton,
+      editForm: sectionEditForm,
+    } = createChecklistSectionTitleEdit(section, handlers.onEditSectionTitle);
+    titleGroup.append(titleEl, sectionEditButton, sectionEditForm);
     header.appendChild(titleGroup);
 
     const { toggleButton: addItemButton, form: addItemForm } = createChecklistItemAddControls((title) =>
@@ -1726,7 +1780,6 @@ export function renderChecklistSections(listEl, sections, itemsBySectionId, edit
 
     header.appendChild(actions);
     sectionEl.appendChild(header);
-    sectionEl.appendChild(sectionEditForm);
     sectionEl.appendChild(addItemForm);
 
     if (isEditMode) {
@@ -1935,7 +1988,8 @@ function openMemoDetailModal(item) {
 }
 
 /**
- * 저장된 메모를 수정하는 인라인 폼을 만든다. 줄바꿈이 가능한 textarea를 쓴다.
+ * 메모 카드를 그 자리에서 바로 수정할 수 있는 인라인 폼을 만든다. 줄바꿈이 가능한 textarea를 쓴다.
+ * 별도 화면/영역이 추가되는 게 아니라 카드의 제목/내용 표시를 그대로 대체한다.
  * @param {{ title: string, content: string }} item
  * @param {(values: { title: string, content: string }) => void} onSave
  * @param {() => void} onCancel
@@ -1965,13 +2019,19 @@ function renderMemoEditForm(item, onSave, onCancel) {
 }
 
 /**
- * 메모 목록을 렌더링한다. 카드를 길게 누르면 수정/삭제 메뉴가 뜬다.
+ * 메모 목록을 렌더링한다. 카드를 길게 누르면 수정/삭제 메뉴가 뜨고, 수정을 고르면 그 카드가
+ * 바로 편집 폼으로 바뀐다(별도 영역이 아래에 추가되지 않음).
  * @param {HTMLElement} listEl
  * @param {Array<{ id: string, title: string, content: string }>} items
- * @param {(id: string) => void} onDelete
- * @param {(id: string, values: { title: string, content: string }) => void} onEdit
+ * @param {string | null} editingId - 현재 인라인 편집 중인 메모 id (없으면 null)
+ * @param {{
+ *   onDelete: (id: string) => void,
+ *   onSave: (id: string, values: { title: string, content: string }) => void,
+ *   onStartEdit: (id: string) => void,
+ *   onCancelEdit: () => void,
+ * }} handlers
  */
-export function renderMemoList(listEl, items, onDelete, onEdit) {
+export function renderMemoList(listEl, items, editingId, handlers) {
   listEl.innerHTML = '';
   closeMemoActionsMenu();
   closeMemoDetailModal();
@@ -1986,6 +2046,17 @@ export function renderMemoList(listEl, items, onDelete, onEdit) {
     const li = document.createElement('li');
     li.className = 'memo-list-item';
 
+    if (item.id === editingId) {
+      const editForm = renderMemoEditForm(
+        item,
+        (values) => handlers.onSave(item.id, values),
+        () => handlers.onCancelEdit(),
+      );
+      li.appendChild(editForm);
+      listEl.appendChild(li);
+      continue;
+    }
+
     const title = document.createElement('p');
     title.className = 'memo-item-title';
     title.textContent = item.title;
@@ -1998,18 +2069,6 @@ export function renderMemoList(listEl, items, onDelete, onEdit) {
       li.appendChild(content);
     }
 
-    const editForm = renderMemoEditForm(
-      item,
-      (values) => {
-        onEdit(item.id, values);
-        editForm.hidden = true;
-      },
-      () => {
-        editForm.hidden = true;
-      },
-    );
-    editForm.hidden = true;
-
     const actionsEl = document.createElement('div');
     actionsEl.className = 'memo-item-actions';
     actionsEl.hidden = true;
@@ -2020,7 +2079,7 @@ export function renderMemoList(listEl, items, onDelete, onEdit) {
     editActionButton.innerHTML = `${ICONS.pencil} 수정`;
     editActionButton.addEventListener('click', () => {
       closeMemoActionsMenu();
-      editForm.hidden = false;
+      handlers.onStartEdit(item.id);
     });
 
     const deleteActionButton = document.createElement('button');
@@ -2030,12 +2089,11 @@ export function renderMemoList(listEl, items, onDelete, onEdit) {
     deleteActionButton.addEventListener('click', () => {
       closeMemoActionsMenu();
       if (!window.confirm(`"${item.title}" 메모를 삭제할까요?`)) return;
-      onDelete(item.id);
+      handlers.onDelete(item.id);
     });
 
     actionsEl.append(editActionButton, deleteActionButton);
     li.appendChild(actionsEl);
-    li.appendChild(editForm);
 
     let longPressTimer = null;
     const startLongPress = (event) => {
@@ -2063,7 +2121,7 @@ export function renderMemoList(listEl, items, onDelete, onEdit) {
 
     li.addEventListener('click', (event) => {
       if (isInteractiveTarget(event.target)) return;
-      if (!actionsEl.hidden || !editForm.hidden) return;
+      if (!actionsEl.hidden) return;
       openMemoDetailModal(item);
     });
 
