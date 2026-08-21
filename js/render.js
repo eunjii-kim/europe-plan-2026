@@ -1851,3 +1851,151 @@ export function renderChecklistSections(listEl, sections, itemsBySectionId, edit
     listEl.appendChild(sectionEl);
   });
 }
+
+/**
+ * "메모" 탭 카드에서 long-press로 열린 편집/삭제 메뉴 상태. 한 번에 하나만 열려있을 수 있다.
+ * @type {{ li: HTMLElement, actionsEl: HTMLElement } | null}
+ */
+let openMemoActionsMenu = null;
+
+function closeMemoActionsMenu() {
+  if (!openMemoActionsMenu) return;
+  openMemoActionsMenu.actionsEl.hidden = true;
+  openMemoActionsMenu = null;
+}
+
+document.addEventListener('click', (event) => {
+  if (!openMemoActionsMenu) return;
+  if (openMemoActionsMenu.li.contains(event.target)) return;
+  closeMemoActionsMenu();
+});
+
+/**
+ * 저장된 메모를 수정하는 인라인 폼을 만든다. 줄바꿈이 가능한 textarea를 쓴다.
+ * @param {{ title: string, content: string }} item
+ * @param {(values: { title: string, content: string }) => void} onSave
+ * @param {() => void} onCancel
+ * @returns {HTMLFormElement}
+ */
+function renderMemoEditForm(item, onSave, onCancel) {
+  const form = document.createElement('form');
+  form.className = 'memo-edit-form';
+  form.innerHTML = `
+    <input type="text" name="title" value="${escapeHtml(item.title)}" placeholder="제목" aria-label="제목" required maxlength="100" />
+    <textarea name="content" placeholder="내용을 입력하세요" aria-label="내용" maxlength="5000">${escapeHtml(item.content || '')}</textarea>
+    <div class="memo-form-actions">
+      <button type="submit">저장</button>
+      <button type="button" class="memo-edit-cancel-button">취소</button>
+    </div>
+  `;
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const data = new FormData(form);
+    onSave({
+      title: data.get('title').trim(),
+      content: data.get('content').trim(),
+    });
+  });
+  form.querySelector('.memo-edit-cancel-button').addEventListener('click', () => onCancel());
+  return form;
+}
+
+/**
+ * 메모 목록을 렌더링한다. 카드를 길게 누르면 수정/삭제 메뉴가 뜬다.
+ * @param {HTMLElement} listEl
+ * @param {Array<{ id: string, title: string, content: string }>} items
+ * @param {(id: string) => void} onDelete
+ * @param {(id: string, values: { title: string, content: string }) => void} onEdit
+ */
+export function renderMemoList(listEl, items, onDelete, onEdit) {
+  listEl.innerHTML = '';
+  closeMemoActionsMenu();
+  if (items.length === 0) {
+    const empty = document.createElement('li');
+    empty.className = 'memo-list-empty';
+    empty.textContent = '아직 작성한 메모가 없습니다.';
+    listEl.appendChild(empty);
+    return;
+  }
+  for (const item of items) {
+    const li = document.createElement('li');
+    li.className = 'memo-list-item';
+
+    const title = document.createElement('p');
+    title.className = 'memo-item-title';
+    title.textContent = item.title;
+    li.appendChild(title);
+
+    if (item.content) {
+      const content = document.createElement('p');
+      content.className = 'memo-item-content';
+      content.textContent = item.content;
+      li.appendChild(content);
+    }
+
+    const editForm = renderMemoEditForm(
+      item,
+      (values) => {
+        onEdit(item.id, values);
+        editForm.hidden = true;
+      },
+      () => {
+        editForm.hidden = true;
+      },
+    );
+    editForm.hidden = true;
+
+    const actionsEl = document.createElement('div');
+    actionsEl.className = 'memo-item-actions';
+    actionsEl.hidden = true;
+
+    const editActionButton = document.createElement('button');
+    editActionButton.type = 'button';
+    editActionButton.className = 'memo-item-action-edit';
+    editActionButton.innerHTML = `${ICONS.pencil} 수정`;
+    editActionButton.addEventListener('click', () => {
+      closeMemoActionsMenu();
+      editForm.hidden = false;
+    });
+
+    const deleteActionButton = document.createElement('button');
+    deleteActionButton.type = 'button';
+    deleteActionButton.className = 'memo-item-action-delete';
+    deleteActionButton.innerHTML = `${ICONS.trash} 삭제`;
+    deleteActionButton.addEventListener('click', () => {
+      closeMemoActionsMenu();
+      if (!window.confirm(`"${item.title}" 메모를 삭제할까요?`)) return;
+      onDelete(item.id);
+    });
+
+    actionsEl.append(editActionButton, deleteActionButton);
+    li.appendChild(actionsEl);
+    li.appendChild(editForm);
+
+    let longPressTimer = null;
+    const startLongPress = (event) => {
+      if (isInteractiveTarget(event.target)) return;
+      clearTimeout(longPressTimer);
+      longPressTimer = setTimeout(() => {
+        closeMemoActionsMenu();
+        actionsEl.hidden = false;
+        openMemoActionsMenu = { li, actionsEl };
+      }, LONG_PRESS_MS);
+    };
+    const cancelLongPress = () => {
+      clearTimeout(longPressTimer);
+      longPressTimer = null;
+    };
+
+    li.addEventListener('mousedown', startLongPress);
+    li.addEventListener('mouseup', cancelLongPress);
+    li.addEventListener('mouseleave', cancelLongPress);
+    li.addEventListener('touchstart', startLongPress, { passive: true });
+    li.addEventListener('touchmove', cancelLongPress);
+    li.addEventListener('touchend', cancelLongPress);
+    li.addEventListener('touchcancel', cancelLongPress);
+    li.addEventListener('contextmenu', (event) => event.preventDefault());
+
+    listEl.appendChild(li);
+  }
+}

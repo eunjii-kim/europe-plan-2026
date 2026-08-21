@@ -26,6 +26,7 @@ import {
   renderExpenseList,
   renderExpenseStats,
   renderChecklistSections,
+  renderMemoList,
   PLACE_FILTER_ALL,
 } from './render.js';
 import { formatKrw, applyBudgetOverrides, applyCustomCostItems, groupCustomCostItemsByAnchorKey } from './budgetCalc.js';
@@ -66,6 +67,7 @@ import {
   updateChecklistItemLink,
   updateChecklistItemTitle,
 } from './checklist.js';
+import { subscribeToMemos, addMemo, deleteMemo, updateMemo } from './memos.js';
 import { subscribeToCustomRegions, addCustomRegion } from './customRegions.js';
 import { subscribeToCustomPlaceCategories, addCustomPlaceCategory } from './customPlaceCategories.js';
 import { isFirebaseConfigured } from './firebaseConfig.js';
@@ -89,6 +91,7 @@ function setupTabs() {
     info: document.getElementById('infoTab'),
     expense: document.getElementById('expenseTab'),
     checklist: document.getElementById('checklistTab'),
+    memo: document.getElementById('memoTab'),
   };
   buttons.forEach((button) => {
     button.addEventListener('click', () => {
@@ -420,6 +423,41 @@ function setupChecklistSectionForm(getSectionCount) {
   });
 }
 
+/** "메모" 탭의 "+ 글쓰기" 토글 버튼과 작성 폼을 연결한다. */
+function setupMemoForm() {
+  const toggleButton = document.getElementById('memoAddToggle');
+  const form = document.getElementById('memoForm');
+  const titleInput = document.getElementById('memoTitleInput');
+  const cancelButton = document.getElementById('memoCancelButton');
+
+  const closeForm = () => {
+    form.reset();
+    form.hidden = true;
+  };
+
+  toggleButton.addEventListener('click', () => {
+    form.hidden = !form.hidden;
+    if (!form.hidden) titleInput.focus();
+  });
+
+  cancelButton.addEventListener('click', closeForm);
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const contentInput = document.getElementById('memoContentInput');
+    const title = titleInput.value.trim();
+    if (!title) return;
+
+    try {
+      await addMemo({ title, content: contentInput.value.trim() });
+      closeForm();
+    } catch (error) {
+      console.error('메모 추가 실패', error);
+      showFirebaseNotice();
+    }
+  });
+}
+
 /**
  * 일정 블록(기존 블록 또는 사용자가 추가한 블록)의 첨부 목록을 저장한다.
  * @param {object} block
@@ -472,6 +510,7 @@ async function main() {
   setupPlaceForm();
   setupExpenseForm();
   setupChecklistSectionForm(() => latestChecklistSections.length);
+  setupMemoForm();
 
   const tripRegions = [...new Set(itineraryData.map((day) => day.region))].filter(
     (region) => !EXCLUDED_REGIONS.has(region),
@@ -921,6 +960,30 @@ async function main() {
     );
   };
 
+  let latestMemos = [];
+  const renderMemoTab = () => {
+    renderMemoList(
+      document.getElementById('memoList'),
+      latestMemos,
+      async (id) => {
+        try {
+          await deleteMemo(id);
+        } catch (error) {
+          console.error('메모 삭제 실패', error);
+          showFirebaseNotice();
+        }
+      },
+      async (id, values) => {
+        try {
+          await updateMemo(id, values);
+        } catch (error) {
+          console.error('메모 수정 실패', error);
+          showFirebaseNotice();
+        }
+      },
+    );
+  };
+
   let latestBudgetOverridesMap = new Map();
   let latestScheduleOverridesMap = new Map();
   let latestCustomBlocksByDay = new Map();
@@ -990,6 +1053,7 @@ async function main() {
   renderScheduleAndSummary();
   renderPlacesTab();
   renderChecklistTab();
+  renderMemoTab();
 
   if (!isFirebaseConfigured) {
     showFirebaseNotice();
@@ -1022,6 +1086,10 @@ async function main() {
     subscribeToChecklistItems((items) => {
       latestChecklistItems = items;
       renderChecklistTab();
+    }, () => showFirebaseNotice());
+    subscribeToMemos((items) => {
+      latestMemos = items;
+      renderMemoTab();
     }, () => showFirebaseNotice());
     subscribeToCustomRegions((regions) => {
       latestCustomRegions = regions;

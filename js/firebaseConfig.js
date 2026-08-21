@@ -51,3 +51,6 @@ export const checklistSectionsCollection = collection(db, 'trips', TRIP_ID, 'che
 
 /** trips/{TRIP_ID}/checklistItems 서브컬렉션 참조 (섹션별 준비물) */
 export const checklistItemsCollection = collection(db, 'trips', TRIP_ID, 'checklistItems');
+
+/** trips/{TRIP_ID}/memos 서브컬렉션 참조 (메모) */
+export const memosCollection = collection(db, 'trips', TRIP_ID, 'memos');

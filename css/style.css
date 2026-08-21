@@ -1286,11 +1286,163 @@ main {
 }
 
 .place-list-empty,
-.expense-list-empty {
+.expense-list-empty,
+.memo-list-empty {
   color: var(--muted-foreground);
   font-size: 0.85rem;
   text-align: center;
   padding: var(--spacing-3);
+}
+
+.memo-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+  margin-top: var(--spacing-3);
+}
+
+.memo-form input,
+.memo-form textarea {
+  padding: var(--spacing-2);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  min-height: var(--touch-target);
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.memo-form textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+.memo-form-actions {
+  display: flex;
+  gap: var(--spacing-2);
+}
+
+.memo-form-actions button {
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  padding: var(--spacing-2) var(--spacing-4);
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+}
+
+.memo-form-actions button[type='submit'] {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border: none;
+}
+
+.memo-form-actions button[type='button'] {
+  background: var(--card);
+  color: var(--foreground);
+}
+
+.memo-list {
+  list-style: none;
+  padding: 0;
+  margin: var(--spacing-3) 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+}
+
+.memo-list-item {
+  position: relative;
+  padding: var(--spacing-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  -webkit-touch-callout: none;
+  user-select: none;
+}
+
+.memo-item-title {
+  margin: 0 0 4px;
+  font-weight: 600;
+}
+
+.memo-item-content {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  white-space: pre-line;
+}
+
+.memo-item-actions {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.memo-item-actions::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--card);
+  opacity: 0.8;
+}
+
+.memo-item-action-edit,
+.memo-item-action-delete {
+  position: relative;
+  z-index: 1;
+  flex: 1 1 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-1);
+  border: none;
+  background: none;
+  font-size: 0.95rem;
+  font-family: var(--font-sans);
+  cursor: pointer;
+}
+
+.memo-item-action-edit {
+  color: var(--primary);
+  border-right: 1px solid var(--border);
+}
+
+.memo-item-action-delete {
+  color: var(--danger);
+}
+
+.memo-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-1);
+  margin-top: var(--spacing-2);
+  padding-top: var(--spacing-2);
+  border-top: 1px dashed var(--border);
+}
+
+.memo-edit-form input,
+.memo-edit-form textarea {
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+}
+
+.memo-edit-form textarea {
+  min-height: 100px;
+  resize: vertical;
+}
+
+.memo-edit-form .memo-form-actions button {
+  padding: 4px 10px;
+  font-size: 0.75rem;
 }
 
 .expense-table-wrapper {

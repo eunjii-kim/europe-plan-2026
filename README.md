@@ -41,8 +41,9 @@ python3 -m http.server 8000
 - `trips/europe-plan-2026/customPlaceCategories` — 정보 탭의 분류 select에서 "+ 새 분류 추가"로 등록한 분류
 - `trips/europe-plan-2026/checklistSections` — 체크리스트 탭의 섹션(예: 의류, 전자기기)
 - `trips/europe-plan-2026/checklistItems` — 섹션별 준비물(체크 여부/메모 포함)
+- `trips/europe-plan-2026/memos` — 메모 탭에서 작성한 메모(제목/내용)
 
-> ⚠️ **아래 규칙은 코드로 자동 적용되지 않습니다.** `customRegions`/`customPlaceCategories`/`checklistSections`/`checklistItems`를 새로 추가했다면, Firebase 콘솔 → Firestore Database → 규칙 탭에서 아래 내용을 직접 붙여넣고 게시해야 지역/분류 추가·체크리스트 탭 기능이 정상 동작합니다. 게시 전까지는 저장을 시도하면 실패 안내 배너가 표시됩니다.
+> ⚠️ **아래 규칙은 코드로 자동 적용되지 않습니다.** `customRegions`/`customPlaceCategories`/`checklistSections`/`checklistItems`/`memos`를 새로 추가했다면, Firebase 콘솔 → Firestore Database → 규칙 탭에서 아래 내용을 직접 붙여넣고 게시해야 지역/분류 추가·체크리스트·메모 탭 기능이 정상 동작합니다. 게시 전까지는 저장을 시도하면 실패 안내 배너가 표시됩니다.
 
 ```
 rules_version = '2';
@@ -156,6 +157,15 @@ service cloud.firestore {
                     && request.resource.data.checked is bool
                     && request.resource.data.memo is string
                     && request.resource.data.memo.size() <= 200;
+      allow delete: if true;
+    }
+    match /trips/europe-plan-2026/memos/{memoId} {
+      allow read: if true;
+      allow create, update: if request.resource.data.title is string
+                    && request.resource.data.title.size() >= 1
+                    && request.resource.data.title.size() <= 100
+                    && request.resource.data.content is string
+                    && request.resource.data.content.size() <= 5000;
       allow delete: if true;
     }
     match /{document=**} {
