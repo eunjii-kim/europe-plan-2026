@@ -1311,16 +1311,20 @@ main {
   font-size: 1rem;
   background: var(--background);
   color: var(--foreground);
+  scroll-margin-top: 60px;
 }
 
 .memo-form textarea {
   min-height: 120px;
+  max-height: 40vh;
+  overflow-y: auto;
   resize: vertical;
 }
 
 .memo-form-actions {
   display: flex;
   gap: var(--spacing-2);
+  scroll-margin: 60px 0 var(--spacing-4);
 }
 
 .memo-form-actions button {
@@ -1357,6 +1361,7 @@ main {
   padding: var(--spacing-2);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
+  cursor: pointer;
   -webkit-touch-callout: none;
   user-select: none;
 }
@@ -1372,6 +1377,11 @@ main {
   font-size: 0.9rem;
   line-height: 1.5;
   white-space: pre-line;
+  display: -webkit-box;
+  -webkit-line-clamp: 7;
+  line-clamp: 7;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .memo-item-actions {
@@ -1433,16 +1443,81 @@ main {
   color: var(--foreground);
   font-family: var(--font-sans);
   font-size: 0.85rem;
+  scroll-margin-top: 60px;
 }
 
 .memo-edit-form textarea {
   min-height: 100px;
+  max-height: 40vh;
+  overflow-y: auto;
   resize: vertical;
 }
 
 .memo-edit-form .memo-form-actions button {
   padding: 4px 10px;
   font-size: 0.75rem;
+}
+
+.memo-detail-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-4);
+}
+
+.memo-detail-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.memo-detail-card {
+  position: relative;
+  z-index: 1;
+  width: min(92vw, 480px);
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+  padding: var(--spacing-5) var(--spacing-4) var(--spacing-4);
+  background: var(--card);
+  color: var(--card-foreground);
+  border-radius: var(--radius);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
+  overflow-y: auto;
+}
+
+.memo-detail-close {
+  position: absolute;
+  top: var(--spacing-2);
+  right: var(--spacing-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--touch-target);
+  min-height: var(--touch-target);
+  border: none;
+  background: none;
+  color: var(--muted-foreground);
+  cursor: pointer;
+}
+
+.memo-detail-title {
+  margin: 0;
+  padding-right: var(--spacing-5);
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.memo-detail-content {
+  margin: 0;
+  color: var(--card-foreground);
+  font-size: 0.95rem;
+  line-height: 1.6;
+  white-space: pre-line;
 }
 
 .expense-table-wrapper {
