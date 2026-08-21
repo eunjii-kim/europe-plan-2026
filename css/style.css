@@ -382,35 +382,11 @@ main {
   font-size: 0.75rem;
 }
 
-.time-block-edit-controls {
-  display: flex;
-  gap: var(--spacing-1);
-  margin-left: auto;
-}
-
-.time-block-icon-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 28px;
-  min-height: 28px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--card);
-  color: var(--foreground);
-  cursor: pointer;
-}
-
-.time-block-delete-button {
-  color: var(--danger);
-}
-
 .time-block-edit-form {
   display: flex;
   flex-wrap: wrap;
   gap: var(--spacing-1);
   align-items: flex-start;
-  margin-top: var(--spacing-1);
 }
 
 .time-block-edit-form input[type='text'] {
@@ -420,6 +396,7 @@ main {
   background: var(--background);
   color: var(--foreground);
   font-size: 0.8rem;
+  scroll-margin-top: 60px;
 }
 
 .time-block-edit-form input[name='time'] {
@@ -433,7 +410,9 @@ main {
 
 .time-block-edit-form textarea {
   flex-basis: 100%;
-  min-height: 50px;
+  min-height: 60px;
+  max-height: 40vh;
+  overflow-y: auto;
   padding: 4px 6px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
@@ -442,6 +421,13 @@ main {
   font-family: var(--font-sans);
   font-size: 0.8rem;
   resize: vertical;
+  scroll-margin-top: 60px;
+}
+
+.time-block-edit-form-actions {
+  display: flex;
+  gap: var(--spacing-1);
+  flex: 1 1 100%;
 }
 
 .time-block-edit-form button {
@@ -452,6 +438,11 @@ main {
   font-size: 0.75rem;
   padding: 4px 10px;
   cursor: pointer;
+}
+
+.time-block-edit-form button[type='button'] {
+  background: var(--card);
+  color: var(--foreground);
 }
 
 .attachment-section {
@@ -585,27 +576,39 @@ main {
   height: 12px;
 }
 
-.time-block-info-menu {
+.time-block-action-menu {
   position: absolute;
   top: 4px;
   right: 0;
   z-index: 2;
+  overflow: hidden;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: var(--card);
   box-shadow: 0 4px 12px rgb(0 0 0 / 0.15);
 }
 
-.time-block-info-menu-button {
-  display: block;
+.time-block-action-menu-button {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-1);
   width: 100%;
-  padding: 8px 14px;
+  padding: 10px 14px;
   border: none;
   background: none;
   color: var(--foreground);
-  font-size: 0.8rem;
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
   white-space: nowrap;
   cursor: pointer;
+}
+
+.time-block-action-menu-button + .time-block-action-menu-button {
+  border-top: 1px solid var(--border);
+}
+
+.time-block-action-menu-delete {
+  color: var(--danger);
 }
 
 .linked-place-add-form {

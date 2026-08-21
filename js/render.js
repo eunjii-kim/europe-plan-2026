@@ -194,19 +194,23 @@ function renderAddCostItemForm(onAdd) {
 }
 
 /**
- * 일정 블록의 시간/제목/메모를 수정하는 인라인 폼을 만든다.
+ * 일정 블록의 시간/제목/메모를 그 자리에서 바로 고치는 인라인 폼을 만든다.
  * @param {{ time: string, title: string, note: string }} block
  * @param {(values: { time: string, title: string, note: string }) => void} onSave
+ * @param {() => void} onCancel
  * @returns {HTMLFormElement}
  */
-function renderTimeBlockEditForm(block, onSave) {
+function renderTimeBlockEditForm(block, onSave, onCancel) {
   const form = document.createElement('form');
   form.className = 'time-block-edit-form';
   form.innerHTML = `
     <input type="text" name="time" value="${escapeHtml(block.time)}" placeholder="시간 (예: 09:00)" aria-label="시간" required />
     <input type="text" name="title" value="${escapeHtml(block.title)}" placeholder="제목" aria-label="제목" required />
     <textarea name="note" placeholder="메모" aria-label="메모">${escapeHtml(block.note || '')}</textarea>
-    <button type="submit">저장</button>
+    <div class="time-block-edit-form-actions">
+      <button type="submit">저장</button>
+      <button type="button" class="time-block-edit-cancel-button">취소</button>
+    </div>
   `;
   form.addEventListener('submit', (event) => {
     event.preventDefault();
@@ -217,74 +221,75 @@ function renderTimeBlockEditForm(block, onSave) {
       note: data.get('note').trim(),
     });
   });
+  form.querySelector('.time-block-edit-cancel-button').addEventListener('click', () => onCancel());
   return form;
 }
 
 /**
- * 편집모드에서 일정 블록에 붙는 수정/삭제/되돌리기 버튼과 수정 폼을 만든다.
+ * 일정 블록을 길게 눌렀을 때 뜨는 액션 메뉴(수정/정보 추가/되돌리기/삭제)를 만든다.
+ * 편집모드를 켜지 않아도 바로 쓸 수 있고, 정보/메모 탭의 길게 누르기 메뉴와 동작이 같다.
  * @param {object} block
  * @param {object} handlers
- * @returns {{ controls: HTMLElement, form: HTMLFormElement | null }}
+ * @param {() => void} onAddInfo - "정보 추가"를 골랐을 때 실행할 동작
+ * @returns {HTMLElement}
  */
-function renderTimeBlockEditControls(block, handlers) {
-  const controls = document.createElement('div');
-  controls.className = 'time-block-edit-controls';
+function renderTimeBlockActionMenu(block, handlers, onAddInfo) {
+  const menu = document.createElement('div');
+  menu.className = 'time-block-action-menu';
+  menu.hidden = true;
 
-  let form = null;
-  if (!block.isCustom) {
-    const editButton = document.createElement('button');
-    editButton.type = 'button';
-    editButton.className = 'time-block-icon-button';
-    editButton.innerHTML = ICONS.pencil;
-    editButton.setAttribute('aria-label', '일정 수정');
+  const createButton = (label, className, onClick) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `time-block-action-menu-button${className ? ` ${className}` : ''}`;
+    button.innerHTML = label;
+    button.addEventListener('click', onClick);
+    return button;
+  };
 
-    form = renderTimeBlockEditForm(block, (values) => {
-      handlers.onEditBlock(block.blockKey, {
-        ...values,
-        attachments: block.attachments || [],
-        linkedPlaces: block.linkedPlaces || [],
-      });
-      form.hidden = true;
-    });
-    form.hidden = true;
-    editButton.addEventListener('click', () => {
-      form.hidden = !form.hidden;
-    });
-    controls.appendChild(editButton);
+  menu.appendChild(
+    createButton(`${ICONS.pencil} 수정`, '', () => {
+      closeTimeBlockActionMenu();
+      handlers.onStartEditBlock(block.blockKey || block.customId);
+    }),
+  );
 
-    if (block.overridden) {
-      const restoreButton = document.createElement('button');
-      restoreButton.type = 'button';
-      restoreButton.className = 'time-block-icon-button';
-      restoreButton.innerHTML = ICONS.rotateCcw;
-      restoreButton.setAttribute('aria-label', '일정 원래대로');
-      restoreButton.addEventListener('click', () => handlers.onRestoreBlock(block.blockKey));
-      controls.appendChild(restoreButton);
-    }
+  menu.appendChild(
+    createButton('➕ 정보 추가', '', () => {
+      closeTimeBlockActionMenu();
+      onAddInfo();
+    }),
+  );
+
+  if (block.overridden) {
+    menu.appendChild(
+      createButton(`${ICONS.rotateCcw} 원래대로`, '', () => {
+        closeTimeBlockActionMenu();
+        if (!window.confirm('이 일정을 원래 내용으로 되돌릴까요?')) return;
+        handlers.onRestoreBlock(block.blockKey);
+      }),
+    );
   }
 
-  const deleteButton = document.createElement('button');
-  deleteButton.type = 'button';
-  deleteButton.className = 'time-block-icon-button time-block-delete-button';
-  deleteButton.innerHTML = ICONS.trash;
-  deleteButton.setAttribute('aria-label', '일정 삭제');
-  deleteButton.addEventListener('click', () => {
-    if (!window.confirm('이 일정을 삭제할까요?')) return;
-    if (block.isCustom) {
-      handlers.onDeleteCustomBlock(block.customId);
-    } else {
-      handlers.onDeleteBlock(block.blockKey, {
-        time: block.time,
-        title: block.title,
-        note: block.note || '',
-        attachments: block.attachments || [],
-        linkedPlaces: block.linkedPlaces || [],
-      });
-    }
-  });
-  controls.appendChild(deleteButton);
+  menu.appendChild(
+    createButton(`${ICONS.trash} 삭제`, 'time-block-action-menu-delete', () => {
+      closeTimeBlockActionMenu();
+      if (!window.confirm(`"${block.title}" 일정을 삭제할까요?`)) return;
+      if (block.isCustom) {
+        handlers.onDeleteCustomBlock(block.customId);
+      } else {
+        handlers.onDeleteBlock(block.blockKey, {
+          time: block.time,
+          title: block.title,
+          note: block.note || '',
+          attachments: block.attachments || [],
+          linkedPlaces: block.linkedPlaces || [],
+        });
+      }
+    }),
+  );
 
-  return { controls, form };
+  return menu;
 }
 
 /**
@@ -394,21 +399,21 @@ function isInteractiveTarget(target) {
 }
 
 /**
- * 일정 탭에서 롱프레스로 열린 "정보 추가" 메뉴 상태. 한 번에 하나만 열려있을 수 있다.
+ * 일정 탭에서 롱프레스로 열린 액션 메뉴 상태. 한 번에 하나만 열려있을 수 있다.
  * @type {{ wrapper: HTMLElement, menuEl: HTMLElement } | null}
  */
-let openTimeBlockInfoMenu = null;
+let openTimeBlockActionMenu = null;
 
-function closeTimeBlockInfoMenu() {
-  if (!openTimeBlockInfoMenu) return;
-  openTimeBlockInfoMenu.menuEl.hidden = true;
-  openTimeBlockInfoMenu = null;
+function closeTimeBlockActionMenu() {
+  if (!openTimeBlockActionMenu) return;
+  openTimeBlockActionMenu.menuEl.hidden = true;
+  openTimeBlockActionMenu = null;
 }
 
 document.addEventListener('click', (event) => {
-  if (!openTimeBlockInfoMenu) return;
-  if (openTimeBlockInfoMenu.wrapper.contains(event.target)) return;
-  closeTimeBlockInfoMenu();
+  if (!openTimeBlockActionMenu) return;
+  if (openTimeBlockActionMenu.wrapper.contains(event.target)) return;
+  closeTimeBlockActionMenu();
 });
 
 /**
@@ -534,11 +539,43 @@ function renderLinkedPlaceAddForm(places, placeCategories, placeRegions, onAdd) 
  * @param {Array<{ id: string, category: string, title: string, region: string }>} [places] - "정보 추가" 메뉴에서 고를 수 있는 장소 목록
  * @param {string[]} [placeCategories] - "정보 추가" 메뉴의 대분류 목록
  * @param {string[]} [placeRegions] - "정보 추가" 메뉴의 지역 필터 목록
+ * @param {string | null} [editingBlockId] - 현재 인라인 편집 중인 블록의 blockKey 또는 customId
  * @returns {HTMLElement}
  */
-function renderTimeBlock(block, rates, handlers, editMode, places = [], placeCategories = [], placeRegions = []) {
+function renderTimeBlock(
+  block,
+  rates,
+  handlers,
+  editMode,
+  places = [],
+  placeCategories = [],
+  placeRegions = [],
+  editingBlockId = null,
+) {
   const wrapper = document.createElement('div');
   wrapper.className = 'time-block';
+
+  const blockId = block.blockKey || block.customId;
+  if (blockId && blockId === editingBlockId) {
+    wrapper.appendChild(
+      renderTimeBlockEditForm(
+        block,
+        (values) => {
+          if (block.isCustom) {
+            handlers.onEditCustomBlock(block.customId, values);
+          } else {
+            handlers.onEditBlock(block.blockKey, {
+              ...values,
+              attachments: block.attachments || [],
+              linkedPlaces: block.linkedPlaces || [],
+            });
+          }
+        },
+        () => handlers.onCancelEditBlock(),
+      ),
+    );
+    return wrapper;
+  }
 
   const mainCostItem = block.costItems?.[0];
   const icon = mainCostItem ? CATEGORY_ICONS[mainCostItem.category] || DEFAULT_CATEGORY_ICON : '';
@@ -563,34 +600,24 @@ function renderTimeBlock(block, rates, handlers, editMode, places = [], placeCat
     wrapper.appendChild(renderLinkedPlaceList(block, handlers));
   }
 
-  const infoMenu = document.createElement('div');
-  infoMenu.className = 'time-block-info-menu';
-  infoMenu.hidden = true;
-  const addInfoButton = document.createElement('button');
-  addInfoButton.type = 'button';
-  addInfoButton.className = 'time-block-info-menu-button';
-  addInfoButton.textContent = '➕ 정보 추가';
-  infoMenu.appendChild(addInfoButton);
-  wrapper.appendChild(infoMenu);
-
   const linkedPlaceForm = renderLinkedPlaceAddForm(places, placeCategories, placeRegions, (values) => {
     handlers.onAddLinkedPlace(block, { id: crypto.randomUUID(), ...values });
   });
-  wrapper.appendChild(linkedPlaceForm);
 
-  addInfoButton.addEventListener('click', () => {
-    closeTimeBlockInfoMenu();
+  const actionMenu = renderTimeBlockActionMenu(block, handlers, () => {
     linkedPlaceForm.hidden = false;
   });
+  wrapper.appendChild(actionMenu);
+  wrapper.appendChild(linkedPlaceForm);
 
   let longPressTimer = null;
   const startLongPress = (event) => {
     if (isInteractiveTarget(event.target)) return;
     clearTimeout(longPressTimer);
     longPressTimer = setTimeout(() => {
-      closeTimeBlockInfoMenu();
-      infoMenu.hidden = false;
-      openTimeBlockInfoMenu = { wrapper, menuEl: infoMenu };
+      closeTimeBlockActionMenu();
+      actionMenu.hidden = false;
+      openTimeBlockActionMenu = { wrapper, menuEl: actionMenu };
     }, LONG_PRESS_MS);
   };
   const cancelLongPress = () => {
@@ -605,13 +632,6 @@ function renderTimeBlock(block, rates, handlers, editMode, places = [], placeCat
   wrapper.addEventListener('touchend', cancelLongPress);
   wrapper.addEventListener('touchcancel', cancelLongPress);
   wrapper.addEventListener('contextmenu', (event) => event.preventDefault());
-
-  let editForm = null;
-  if (editMode) {
-    const { controls, form } = renderTimeBlockEditControls(block, handlers);
-    editForm = form;
-    main.appendChild(controls);
-  }
 
   const hasAttachments = Boolean(block.attachments && block.attachments.length > 0);
   const hasMore = Boolean(block.note) || (block.costItems && block.costItems.length > 0) || hasAttachments || editMode;
@@ -696,10 +716,6 @@ function renderTimeBlock(block, rates, handlers, editMode, places = [], placeCat
     wrapper.appendChild(more);
   }
 
-  if (editForm) {
-    wrapper.appendChild(editForm);
-  }
-
   return wrapper;
 }
 
@@ -771,6 +787,7 @@ function renderAddBlockSection(dayId, onAdd) {
  * @param {Array<{ id: string, category: string, title: string, region: string }>} [places] - "정보 추가" 메뉴에서 고를 수 있는 장소 목록
  * @param {string[]} [placeCategories] - "정보 추가" 메뉴의 대분류 목록
  * @param {string[]} [placeRegions] - "정보 추가" 메뉴의 지역 필터 목록
+ * @param {string | null} [editingBlockId] - 현재 인라인 편집 중인 블록의 blockKey 또는 customId
  */
 export function renderDayList(
   listEl,
@@ -783,9 +800,10 @@ export function renderDayList(
   places = [],
   placeCategories = [],
   placeRegions = [],
+  editingBlockId = null,
 ) {
   listEl.innerHTML = '';
-  closeTimeBlockInfoMenu();
+  closeTimeBlockActionMenu();
   itineraryData.forEach((day, index) => {
     const { accentVar, bgVar, flag } = getCountryAccent(day.region);
     const card = document.createElement('details');
@@ -807,7 +825,9 @@ export function renderDayList(
     const blockList = document.createElement('div');
     blockList.className = 'time-block-list';
     for (const block of day.timeBlocks) {
-      blockList.appendChild(renderTimeBlock(block, rates, handlers, editMode, places, placeCategories, placeRegions));
+      blockList.appendChild(
+        renderTimeBlock(block, rates, handlers, editMode, places, placeCategories, placeRegions, editingBlockId),
+      );
     }
     card.appendChild(blockList);
 

@@ -49,6 +49,7 @@ import {
   subscribeToScheduleCustomBlocks,
   addScheduleCustomBlock,
   deleteScheduleCustomBlock,
+  updateScheduleCustomBlock,
   updateScheduleCustomBlockAttachments,
   updateScheduleCustomBlockLinkedPlaces,
 } from './schedule.js';
@@ -642,10 +643,30 @@ async function main() {
     onEditBlock: async (blockKey, values) => {
       try {
         await setScheduleOverride(blockKey, values);
+        scheduleEditingBlockId = null;
+        renderScheduleAndSummary();
       } catch (error) {
         console.error('일정 내용 수정 실패', error);
         showFirebaseNotice();
       }
+    },
+    onEditCustomBlock: async (customId, values) => {
+      try {
+        await updateScheduleCustomBlock(customId, values);
+        scheduleEditingBlockId = null;
+        renderScheduleAndSummary();
+      } catch (error) {
+        console.error('추가한 일정 수정 실패', error);
+        showFirebaseNotice();
+      }
+    },
+    onStartEditBlock: (blockId) => {
+      scheduleEditingBlockId = blockId;
+      renderScheduleAndSummary();
+    },
+    onCancelEditBlock: () => {
+      scheduleEditingBlockId = null;
+      renderScheduleAndSummary();
     },
     onDeleteBlock: async (blockKey, currentValues) => {
       try {
@@ -1041,6 +1062,7 @@ async function main() {
   let latestScheduleOverridesMap = new Map();
   let latestCustomBlocksByDay = new Map();
   let hasRenderedScheduleOnce = false;
+  let scheduleEditingBlockId = null;
   const renderScheduleAndSummary = () => {
     const budgetApplied = applyBudgetOverrides(itineraryData, latestBudgetOverridesMap);
     const scheduleApplied = applyScheduleOverrides(budgetApplied, latestScheduleOverridesMap, latestCustomBlocksByDay);
@@ -1061,6 +1083,7 @@ async function main() {
       latestPlaces,
       linkedPlaceCategories,
       linkedPlaceRegions,
+      scheduleEditingBlockId,
     );
     hasRenderedScheduleOnce = true;
     plannedTotal = renderBudgetSummary(
