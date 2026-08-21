@@ -110,6 +110,20 @@ export async function deleteScheduleCustomBlock(customId) {
 }
 
 /**
+ * 사용자가 추가한 일정 블록의 시간/제목/메모를 수정한다.
+ * @param {string} customId
+ * @param {{ time: string, title: string, note: string }} values
+ * @returns {Promise<void>}
+ */
+export async function updateScheduleCustomBlock(customId, values) {
+  await setDoc(
+    doc(scheduleCustomBlocksCollection, customId),
+    { time: values.time, title: values.title, note: values.note || '' },
+    { merge: true },
+  );
+}
+
+/**
  * 사용자가 추가한 일정 블록의 첨부 목록만 갱신한다.
  * @param {string} customId
  * @param {Array<{ type: string, url: string, label?: string }>} attachments
