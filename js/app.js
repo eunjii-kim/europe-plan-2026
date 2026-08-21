@@ -82,6 +82,21 @@ function toIsoDate(date) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
+/**
+ * 한 줄 입력칸에서 Enter를 눌러도 폼이 곧바로 제출되지 않게 막는다.
+ * 실수로 입력 도중 등록되는 것을 막고, 항상 저장/추가 버튼을 눌러 확정하게 한다.
+ * textarea(줄바꿈)와 버튼(Enter로 누르기)은 그대로 둔다.
+ */
+function setupEnterKeyGuard() {
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter') return;
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement)) return;
+    if (!target.form) return;
+    event.preventDefault();
+  });
+}
+
 /** 탭 버튼과 패널을 서로 연결한다. */
 function setupTabs() {
   const buttons = document.querySelectorAll('.tab-button');
@@ -503,6 +518,7 @@ async function main() {
   document.getElementById('tripSub').textContent = `${TRIP_INFO.regionLabel} · ${TRIP_INFO.startDate} ~ ${TRIP_INFO.endDate}`;
   document.getElementById('ddayLabel').textContent = computeDdayLabel(TRIP_INFO);
 
+  setupEnterKeyGuard();
   setupTabs();
   setupThemeToggle();
   setupExpandCollapseButtons();
@@ -702,6 +718,7 @@ async function main() {
 
   let latestPlaces = [];
   let latestEffectiveScheduleData = [];
+  let placeEditingId = null;
   let placeFilterCategory = PLACE_FILTER_ALL;
   let placeFilterRegion = PLACE_FILTER_ALL;
   let placeFavoriteOnly = false;
@@ -746,57 +763,84 @@ async function main() {
       allPlaceCategories,
       allPlaceRegions,
       buildPlaceScheduleDates(latestEffectiveScheduleData),
-      async (id) => {
-        try {
-          await deletePlace(id);
-        } catch (error) {
-          console.error('장소 삭제 실패', error);
-          showFirebaseNotice();
-        }
-      },
-      async (id, values) => {
-        try {
-          await updatePlace(id, values);
-        } catch (error) {
-          console.error('장소 수정 실패', error);
-          showFirebaseNotice();
-        }
-      },
-      async (id, favorite) => {
-        try {
-          await toggleFavoritePlace(id, favorite);
-        } catch (error) {
-          console.error('장소 즐겨찾기 변경 실패', error);
-          showFirebaseNotice();
-        }
+      placeEditingId,
+      {
+        onDelete: async (id) => {
+          try {
+            await deletePlace(id);
+          } catch (error) {
+            console.error('장소 삭제 실패', error);
+            showFirebaseNotice();
+          }
+        },
+        onSave: async (id, values) => {
+          try {
+            await updatePlace(id, values);
+            placeEditingId = null;
+            renderPlacesTab();
+          } catch (error) {
+            console.error('장소 수정 실패', error);
+            showFirebaseNotice();
+          }
+        },
+        onStartEdit: (id) => {
+          placeEditingId = id;
+          renderPlacesTab();
+        },
+        onCancelEdit: () => {
+          placeEditingId = null;
+          renderPlacesTab();
+        },
+        onToggleFavorite: async (id, favorite) => {
+          try {
+            await toggleFavoritePlace(id, favorite);
+          } catch (error) {
+            console.error('장소 즐겨찾기 변경 실패', error);
+            showFirebaseNotice();
+          }
+        },
       },
     );
   };
 
   let latestExpenses = [];
+  let expenseEditingId = null;
   let expensePerPersonView = false;
   const renderExpenseTab = () => {
     renderExpenseList(
       document.getElementById('expenseList'),
       latestExpenses,
       rates,
-      async (id) => {
-        try {
-          await deleteExpense(id);
-        } catch (error) {
-          console.error('지출 기록 삭제 실패', error);
-          showFirebaseNotice();
-        }
-      },
-      async (id, values) => {
-        try {
-          await updateExpense(id, values);
-        } catch (error) {
-          console.error('지출 기록 수정 실패', error);
-          showFirebaseNotice();
-        }
-      },
       [...tripRegions, ...latestCustomRegions.map((r) => r.name)],
+      expenseEditingId,
+      {
+        onDelete: async (id) => {
+          try {
+            await deleteExpense(id);
+          } catch (error) {
+            console.error('지출 기록 삭제 실패', error);
+            showFirebaseNotice();
+          }
+        },
+        onSave: async (id, values) => {
+          try {
+            await updateExpense(id, values);
+            expenseEditingId = null;
+            renderExpenseTab();
+          } catch (error) {
+            console.error('지출 기록 수정 실패', error);
+            showFirebaseNotice();
+          }
+        },
+        onStartEdit: (id) => {
+          expenseEditingId = id;
+          renderExpenseTab();
+        },
+        onCancelEdit: () => {
+          expenseEditingId = null;
+          renderExpenseTab();
+        },
+      },
     );
     renderExpenseStats(document.getElementById('expenseStats'), latestExpenses, rates, expensePerPersonView, () => {
       expensePerPersonView = !expensePerPersonView;
@@ -961,11 +1005,10 @@ async function main() {
   };
 
   let latestMemos = [];
+  let memoEditingId = null;
   const renderMemoTab = () => {
-    renderMemoList(
-      document.getElementById('memoList'),
-      latestMemos,
-      async (id) => {
+    renderMemoList(document.getElementById('memoList'), latestMemos, memoEditingId, {
+      onDelete: async (id) => {
         try {
           await deleteMemo(id);
         } catch (error) {
@@ -973,15 +1016,25 @@ async function main() {
           showFirebaseNotice();
         }
       },
-      async (id, values) => {
+      onSave: async (id, values) => {
         try {
           await updateMemo(id, values);
+          memoEditingId = null;
+          renderMemoTab();
         } catch (error) {
           console.error('메모 수정 실패', error);
           showFirebaseNotice();
         }
       },
-    );
+      onStartEdit: (id) => {
+        memoEditingId = id;
+        renderMemoTab();
+      },
+      onCancelEdit: () => {
+        memoEditingId = null;
+        renderMemoTab();
+      },
+    });
   };
 
   let latestBudgetOverridesMap = new Map();
