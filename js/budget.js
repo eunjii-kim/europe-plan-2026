@@ -82,8 +82,11 @@ export function subscribeToBudgetOverrides(onChange, onError) {
 /**
  * 기존 일정 비용 항목을 사용자가 지정한 값으로 덮어쓰거나, 새 비용 항목을 만든다.
  * setDoc은 merge 없이 문서를 통째로 덮어쓰므로 category를 항상 함께 보내야 한다.
+ *
+ * data.js에 원래부터 있던 비용 항목은 문서를 지워도 원본이 다시 살아나므로 지울 수가 없다.
+ * 그래서 일정 블록 삭제(setScheduleOverride)와 같은 방식으로 deleted 표시를 남겨 화면에서 감춘다.
  * @param {string} key - buildCostItemKey 또는 buildCustomCostItemKeyPrefix로 만든 항목 키
- * @param {{ category: string, amount: number, currency: string, headcount: number }} values
+ * @param {{ category: string, amount: number, currency: string, headcount: number, deleted?: boolean }} values
  * @returns {Promise<void>}
  */
 export async function setBudgetOverride(key, values) {
@@ -92,6 +95,7 @@ export async function setBudgetOverride(key, values) {
     amount: values.amount,
     currency: values.currency,
     headcount: values.headcount,
+    deleted: Boolean(values.deleted),
     updatedAt: serverTimestamp(),
   });
 }
