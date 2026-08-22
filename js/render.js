@@ -1191,6 +1191,11 @@ export function renderPlaceFilters(
   onSelectRegion,
   onToggleFavorite,
 ) {
+  // 필터를 고를 때마다 이 함수가 다시 실행되면서 버튼이 전부 새로 만들어진다.
+  // 그러면 가로 스크롤이 맨 앞으로 되돌아가, 오른쪽 끝에 있던 지역을 하나 고른 뒤
+  // 다음 지역을 고르려면 매번 다시 스크롤해야 했다. 그리기 전 위치를 기억해 두었다가 되돌린다.
+  const previousScrollLeft = [...containerEl.querySelectorAll('.place-filter-scroll')].map((el) => el.scrollLeft);
+
   containerEl.innerHTML = '';
 
   const categoryRow = document.createElement('div');
@@ -1244,6 +1249,11 @@ export function renderPlaceFilters(
   regionRow.append(regionLabel, regionScroll);
 
   containerEl.append(categoryRow, regionRow);
+
+  // scrollLeft는 화면에 붙은 뒤에만 적용되므로 append 이후에 되돌린다.
+  [categoryScroll, regionScroll].forEach((scrollEl, index) => {
+    scrollEl.scrollLeft = previousScrollLeft[index] || 0;
+  });
 }
 
 /**
