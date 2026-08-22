@@ -10,6 +10,7 @@ import {
   PLACE_CATEGORIES,
   PLACE_CATEGORY_ICONS,
   DEFAULT_TAB,
+  SCHEDULE_TAB,
   SCROLL_RESTORE_TOLERANCE_PX,
 } from './constants.js';
 import { getExchangeRates } from './exchangeRate.js';
@@ -33,7 +34,7 @@ import {
 import { formatKrw, applyBudgetOverrides, applyCustomCostItems, groupCustomCostItemsByAnchorKey } from './budgetCalc.js';
 import { UNSPECIFIED_REGION_LABEL } from './expenseCalc.js';
 import { applyScheduleOverrides } from './scheduleCalc.js';
-import { setupScrollSpy } from './scrollSpy.js';
+import { setupScrollSpy, updateActiveDayPill } from './scrollSpy.js';
 import {
   subscribeToBudgetItems,
   addBudgetItem,
@@ -132,6 +133,15 @@ function setupTabs() {
       });
 
       restoreTabScroll(scrollPositions[nextTab] || 0);
+
+      // 숨어 있는 동안 일정이 다시 그려졌다면 날짜 pill 하이라이트가 지워져 있으므로 다시 맞춘다.
+      if (nextTab === SCHEDULE_TAB) {
+        updateActiveDayPill(
+          document.getElementById('dayList'),
+          document.getElementById('dayNav'),
+          document.querySelector('.tab-bar'),
+        );
+      }
     });
   });
 }
