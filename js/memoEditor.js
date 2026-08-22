@@ -4,7 +4,15 @@
  */
 
 import { ICONS, MEMO_TABLE_MAX_COLUMNS } from './constants.js';
-import { compressImageFile, createEmptyTable, hasTableContent, parseClipboardTable } from './memoAttachments.js';
+import {
+  TABLE_TEXT_SEPARATORS,
+  compressImageFile,
+  createEmptyTable,
+  createTableFromRows,
+  hasTableContent,
+  parseClipboardTable,
+  parseTableText,
+} from './memoAttachments.js';
 
 /**
  * 아이콘 하나만 들어가는 작은 버튼을 만든다.
@@ -190,6 +198,81 @@ function createTableEditor(table, onRemove) {
 }
 
 /**
+ * 붙여넣은 텍스트를 표로 바꿔주는 입력창을 만든다.
+ * 휴대폰에서는 표 칸에 바로 붙여넣어도 앱이 탭을 넣어주지 않아 한 칸에 다 들어가는 경우가 있어,
+ * 텍스트를 통째로 받아 구분 방식을 직접 고를 수 있는 길을 따로 뒀다.
+ * @param {(rows: string[][]) => void} onCreate
+ * @returns {{ element: HTMLElement, toggle: () => void, close: () => void }}
+ */
+function createTablePasteBox(onCreate) {
+  const box = document.createElement('div');
+  box.className = 'memo-table-paste-box';
+  box.hidden = true;
+
+  const textarea = document.createElement('textarea');
+  textarea.className = 'memo-table-paste-input';
+  textarea.placeholder = '스프레드시트에서 복사한 내용을 여기에 붙여넣으세요.';
+  textarea.setAttribute('aria-label', '표로 만들 텍스트');
+
+  const separatorRow = document.createElement('div');
+  separatorRow.className = 'memo-table-paste-separator';
+  const separatorLabel = document.createElement('span');
+  separatorLabel.textContent = '열 구분';
+  const separatorSelect = document.createElement('select');
+  separatorSelect.setAttribute('aria-label', '열 구분 방식');
+  separatorSelect.innerHTML = TABLE_TEXT_SEPARATORS.map(
+    (option) => `<option value="${option.value}">${option.label}</option>`,
+  ).join('');
+  separatorRow.append(separatorLabel, separatorSelect);
+
+  const message = document.createElement('p');
+  message.className = 'memo-table-paste-message';
+  message.hidden = true;
+
+  const actions = document.createElement('div');
+  actions.className = 'memo-table-actions';
+
+  const close = () => {
+    box.hidden = true;
+    textarea.value = '';
+    message.hidden = true;
+  };
+
+  const createButton = document.createElement('button');
+  createButton.type = 'button';
+  createButton.className = 'memo-table-action';
+  createButton.textContent = '표로 만들기';
+  createButton.addEventListener('click', () => {
+    const rows = parseTableText(textarea.value, separatorSelect.value);
+    if (!rows) {
+      message.textContent = '표로 만들 내용이 없습니다.';
+      message.hidden = false;
+      return;
+    }
+    onCreate(rows);
+    close();
+  });
+
+  const cancelButton = document.createElement('button');
+  cancelButton.type = 'button';
+  cancelButton.className = 'memo-table-action';
+  cancelButton.textContent = '취소';
+  cancelButton.addEventListener('click', close);
+
+  actions.append(createButton, cancelButton);
+  box.append(textarea, separatorRow, message, actions);
+
+  return {
+    element: box,
+    toggle: () => {
+      box.hidden = !box.hidden;
+      if (!box.hidden) textarea.focus();
+    },
+    close,
+  };
+}
+
+/**
  * 메모의 사진/표 편집기를 만든다. 저장할 값은 collect()로 한 번에 꺼낸다.
  * @param {{ images?: Array<{ id: string, dataUrl: string, name: string }>, tables?: Array<{ id: string, rows: string[][] }> }} [initial]
  * @returns {{ element: HTMLElement, collect: () => { images: Array, tables: Array }, reset: () => void }}
@@ -287,7 +370,8 @@ export function createMemoAttachmentsEditor(initial = {}) {
 
   const tableHint = document.createElement('p');
   tableHint.className = 'memo-attachment-hint';
-  tableHint.textContent = '엑셀·스프레드시트에서 복사한 내용을 칸에 붙여넣으면 행과 열이 자동으로 채워집니다.';
+  tableHint.textContent =
+    '엑셀·스프레드시트에서 복사한 내용을 칸에 붙여넣으면 행과 열이 자동으로 채워집니다. 한 칸에 다 들어가 버리면 "붙여넣기로 표 만들기"를 쓰세요.';
 
   const tableList = document.createElement('div');
   tableList.className = 'memo-table-edit-list';
@@ -304,13 +388,25 @@ export function createMemoAttachmentsEditor(initial = {}) {
     tableList.appendChild(editor.element);
   }
 
+  const pasteBox = createTablePasteBox((rows) => addTable(createTableFromRows(rows)));
+
+  const tableButtons = document.createElement('div');
+  tableButtons.className = 'memo-table-add-buttons';
+
   const addTableButton = document.createElement('button');
   addTableButton.type = 'button';
   addTableButton.className = 'memo-attachment-add-button';
   addTableButton.textContent = '+ 표 추가';
   addTableButton.addEventListener('click', () => addTable(createEmptyTable()));
 
-  tableSection.append(tableLabel, tableHint, tableList, addTableButton);
+  const pasteToggleButton = document.createElement('button');
+  pasteToggleButton.type = 'button';
+  pasteToggleButton.className = 'memo-attachment-add-button';
+  pasteToggleButton.textContent = '+ 붙여넣기로 표 만들기';
+  pasteToggleButton.addEventListener('click', () => pasteBox.toggle());
+
+  tableButtons.append(addTableButton, pasteToggleButton);
+  tableSection.append(tableLabel, tableHint, tableList, tableButtons, pasteBox.element);
   element.append(message, imageSection, tableSection);
 
   /** 편집기를 주어진 값으로 처음부터 다시 채운다. */
@@ -322,6 +418,7 @@ export function createMemoAttachmentsEditor(initial = {}) {
     tableList.innerHTML = '';
     initialTables.forEach((table) => addTable({ id: table.id, rows: table.rows.map((row) => [...row]) }));
 
+    pasteBox.close();
     message.hidden = true;
   }
 

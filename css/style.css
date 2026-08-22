@@ -1744,6 +1744,59 @@ main {
   color: var(--muted-foreground);
 }
 
+.memo-table-add-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-2);
+}
+
+.memo-table-paste-box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+  width: 100%;
+  padding: var(--spacing-2);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.memo-form .memo-table-paste-input,
+.memo-edit-form .memo-table-paste-input {
+  width: 100%;
+  min-height: 96px;
+  font-size: 0.85rem;
+  /* 붙여넣은 줄이 접히면 몇 열짜리인지 눈으로 확인하기 어려워 가로로 스크롤되게 둔다. */
+  white-space: pre;
+  overflow: auto;
+  resize: vertical;
+}
+
+.memo-table-paste-separator {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  font-size: 0.8rem;
+  color: var(--muted-foreground);
+}
+
+.memo-form .memo-table-paste-separator select,
+.memo-edit-form .memo-table-paste-separator select {
+  padding: 4px 6px;
+  min-height: 32px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+}
+
+.memo-table-paste-message {
+  margin: 0;
+  color: var(--danger);
+  font-size: 0.8rem;
+}
+
 .memo-table-action svg {
   width: 14px;
   height: 14px;
