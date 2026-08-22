@@ -41,7 +41,7 @@ python3 -m http.server 8000
 - `trips/europe-plan-2026/customPlaceCategories` — 정보 탭의 분류 select에서 "+ 새 분류 추가"로 등록한 분류
 - `trips/europe-plan-2026/checklistSections` — 체크리스트 탭의 섹션(예: 의류, 전자기기)
 - `trips/europe-plan-2026/checklistItems` — 섹션별 준비물(체크 여부/메모 포함)
-- `trips/europe-plan-2026/memos` — 메모 탭에서 작성한 메모(제목/내용)
+- `trips/europe-plan-2026/memos` — 메모 탭에서 작성한 메모(제목/내용/사진/표)
 
 > ⚠️ **아래 규칙은 코드로 자동 적용되지 않습니다.** `customRegions`/`customPlaceCategories`/`checklistSections`/`checklistItems`/`memos`를 새로 추가했다면, Firebase 콘솔 → Firestore Database → 규칙 탭에서 아래 내용을 직접 붙여넣고 게시해야 지역/분류 추가·체크리스트·메모 탭 기능이 정상 동작합니다. 게시 전까지는 저장을 시도하면 실패 안내 배너가 표시됩니다.
 
@@ -187,7 +187,9 @@ service cloud.firestore {
 
 설정 전(또는 연결 실패 시)에도 사이트 자체(일정 보기)는 정상 동작하며, 예산 탭에는 안내 배너가 표시됩니다.
 
-> 더보기 첨부는 이미지/링크 URL을 붙여넣는 방식만 지원합니다. 기기에서 사진 파일을 직접 업로드하는 기능은 Firebase Storage가 2024년 10월부터 유료 요금제(Blaze)에서만 활성화되는 정책으로 바뀌어 이 프로젝트에서는 지원하지 않기로 했습니다.
+> 일정 탭의 더보기 첨부는 이미지/링크 URL을 붙여넣는 방식만 지원합니다. Firebase Storage가 2024년 10월부터 유료 요금제(Blaze)에서만 활성화되는 정책으로 바뀌어 이 프로젝트는 파일 저장소를 쓰지 않기 때문입니다.
+>
+> 메모 탭의 사진은 예외로, 기기에서 고른 사진을 브라우저에서 가로/세로 1200px·JPEG로 줄인 뒤 메모 문서 안에 직접 넣어 저장합니다. Storage 없이도 사진을 올릴 수 있지만 Firestore 문서 한도(1MiB)를 함께 쓰는 구조라, 메모 하나에 담을 수 있는 총 용량을 0.9MB로 제한하고 넘으면 저장 전에 안내합니다(대략 사진 3~4장). 사진이 많다면 메모를 나눠 작성하세요.
 
 ## 2. GitHub Pages로 배포하기
 

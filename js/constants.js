@@ -111,6 +111,29 @@ export const SCROLL_RESTORE_TOLERANCE_PX = 2;
 export const THEME_STORAGE_KEY = 'europePlan2026:theme';
 
 /**
+ * 메모에 첨부한 사진을 줄일 때 허용하는 가로/세로 최대 길이(px).
+ * Firebase Storage는 유료 요금제 전용이라(README 참고) 사진을 Firestore 문서 안에 직접 넣는데,
+ * 원본 사진을 그대로 넣으면 문서 하나가 곧바로 용량 제한을 넘기 때문에 반드시 줄여서 저장한다.
+ */
+export const MEMO_IMAGE_MAX_DIMENSION_PX = 1200;
+
+/** 메모 사진을 JPEG로 다시 저장할 때 쓰는 품질(0~1). 여행 사진 기준 눈에 띄는 열화 없이 용량이 크게 준다. */
+export const MEMO_IMAGE_QUALITY = 0.7;
+
+/**
+ * 메모 하나(제목·내용·사진·표 전체)에 허용하는 최대 크기(byte).
+ * Firestore 문서 한도는 1MiB지만 필드 이름·타임스탬프 등 부가 용량이 붙으므로 여유를 두고 잡는다.
+ */
+export const MEMO_MAX_BYTES = 900 * 1024;
+
+/** 새로 만드는 표의 기본 크기 (머리글 1행 + 데이터 2행) */
+export const MEMO_TABLE_DEFAULT_ROWS = 3;
+export const MEMO_TABLE_DEFAULT_COLUMNS = 2;
+
+/** 표의 열 개수 상한. 휴대폰 화면에서 가로로 읽을 수 있는 한계를 고려한 값이다. */
+export const MEMO_TABLE_MAX_COLUMNS = 8;
+
+/**
  * shadcn/ui가 쓰는 lucide 아이콘과 동일한 선형(outline) 스타일의 SVG 아이콘 모음.
  * stroke="currentColor"라 버튼의 color 값을 그대로 물려받는다. 편집/삭제/토글 등
  * 기능성 UI 아이콘에만 쓰고, 카테고리 이모지(CATEGORY_ICONS)나 국기 등

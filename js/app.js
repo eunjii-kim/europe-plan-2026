@@ -77,6 +77,8 @@ import {
   updateChecklistItemTitle,
 } from './checklist.js';
 import { subscribeToMemos, addMemo, deleteMemo, updateMemo } from './memos.js';
+import { formatMegabytes, measureMemoSize } from './memoAttachments.js';
+import { createMemoAttachmentsEditor } from './memoEditor.js';
 import { subscribeToCustomRegions, addCustomRegion } from './customRegions.js';
 import { subscribeToCustomPlaceCategories, addCustomPlaceCategory } from './customPlaceCategories.js';
 import { isFirebaseConfigured } from './firebaseConfig.js';
@@ -380,6 +382,38 @@ function showFirebaseNotice() {
   });
 }
 
+/**
+ * "메모" 탭 안내 문구를 띄운다. 서버 문제가 아닌 용량 초과 같은 상황도 같은 자리에 보여준다.
+ * @param {string} message
+ */
+function showMemoNotice(message) {
+  const notice = document.querySelector('#memoTab .firebase-notice');
+  if (!notice) return;
+  notice.hidden = false;
+  notice.textContent = message;
+}
+
+/** "메모" 탭 안내 문구를 감춘다. */
+function hideMemoNotice() {
+  const notice = document.querySelector('#memoTab .firebase-notice');
+  if (notice) notice.hidden = true;
+}
+
+/**
+ * 메모가 Firestore 문서 한도를 넘지 않는지 확인한다.
+ * 사진을 문서 안에 직접 넣는 구조라, 저장을 시도했다가 실패하는 대신 미리 이유를 알려준다.
+ * @param {{ title: string, content: string, images: Array, tables: Array }} memo
+ * @returns {boolean} 저장해도 되는지 여부
+ */
+function ensureMemoWithinLimit(memo) {
+  const { withinLimit, bytes, limitBytes } = measureMemoSize(memo);
+  if (withinLimit) return true;
+  showMemoNotice(
+    `사진 용량이 너무 큽니다(${formatMegabytes(bytes)}). 메모 하나에는 ${formatMegabytes(limitBytes)}까지만 담을 수 있으니 사진을 몇 장 빼고 저장해 주세요.`,
+  );
+  return false;
+}
+
 /** "정보" 탭의 장소 추가 폼 제출을 처리한다. */
 function setupPlaceForm() {
   const form = document.getElementById('placeForm');
@@ -469,9 +503,16 @@ function setupMemoForm() {
   const titleInput = document.getElementById('memoTitleInput');
   const cancelButton = document.getElementById('memoCancelButton');
 
+  // 카드 인라인 수정 폼(render.js)과 똑같은 사진/표 편집기를 여기에도 붙인다.
+  const attachments = createMemoAttachmentsEditor();
+  document.getElementById('memoAttachmentsEditor').appendChild(attachments.element);
+
   const closeForm = () => {
     form.reset();
+    // form.reset()은 자바스크립트로 만든 사진/표까지 지우지는 못하므로 편집기를 따로 비운다.
+    attachments.reset();
     form.hidden = true;
+    hideMemoNotice();
   };
 
   toggleButton.addEventListener('click', () => {
@@ -487,8 +528,11 @@ function setupMemoForm() {
     const title = titleInput.value.trim();
     if (!title) return;
 
+    const memo = { title, content: contentInput.value.trim(), ...attachments.collect() };
+    if (!ensureMemoWithinLimit(memo)) return;
+
     try {
-      await addMemo({ title, content: contentInput.value.trim() });
+      await addMemo(memo);
       closeForm();
     } catch (error) {
       console.error('메모 추가 실패', error);
@@ -1061,8 +1105,10 @@ async function main() {
         }
       },
       onSave: async (id, values) => {
+        if (!ensureMemoWithinLimit(values)) return;
         try {
           await updateMemo(id, values);
+          hideMemoNotice();
           memoEditingId = null;
           renderMemoTab();
         } catch (error) {
