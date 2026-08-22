@@ -95,8 +95,11 @@ export const ADD_NEW_REGION_VALUE = '__add_new_region__';
 /** 분류 select 맨 아래 "+ 새 분류 추가" 옵션에 쓰는 sentinel value */
 export const ADD_NEW_CATEGORY_VALUE = '__add_new_category__';
 
+/** 일정 탭의 data-tab 값 */
+export const SCHEDULE_TAB = 'schedule';
+
 /** 페이지를 처음 열었을 때 선택되어 있는 탭 (index.html의 aria-selected와 일치해야 한다) */
-export const DEFAULT_TAB = 'schedule';
+export const DEFAULT_TAB = SCHEDULE_TAB;
 
 /**
  * 탭 전환 후 스크롤 위치를 복원할 때 "이미 복원됐다"고 볼 오차(px).

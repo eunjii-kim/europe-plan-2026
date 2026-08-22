@@ -3,6 +3,42 @@ import { setActiveDayPill } from './render.js';
 let observer = null;
 
 /**
+ * sticky로 고정되는 헤더(탭바 + 날짜 네비게이션) 높이. 이 아래부터가 실제로 일정이 보이는 영역이다.
+ * @param {HTMLElement} dayNavEl
+ * @param {HTMLElement} tabBarEl
+ * @returns {number}
+ */
+function getStickyOffset(dayNavEl, tabBarEl) {
+  return tabBarEl.offsetHeight + dayNavEl.offsetHeight;
+}
+
+/**
+ * 지금 화면에서 sticky 헤더 바로 아래에 걸쳐 있는 첫 날짜 카드를 찾아 pill을 활성 표시한다.
+ *
+ * IntersectionObserver의 첫 콜백은 다음 렌더링 프레임에야 전달되는데, 페이지가 멈춰 있으면
+ * 프레임이 만들어지지 않아 그 콜백이 오지 않는다. 게다가 renderDayNav가 다시 그릴 때마다
+ * pill이 새로 만들어져 is-active 표시가 사라지므로, 관찰만 걸어두면 "스크롤을 한 번 움직이기
+ * 전까지 아무 날짜도 표시되지 않는" 상태가 된다. 그래서 현재 위치를 직접 계산해 한 번 맞춰준다.
+ * @param {HTMLElement} dayListEl
+ * @param {HTMLElement} dayNavEl
+ * @param {HTMLElement} tabBarEl
+ */
+export function updateActiveDayPill(dayListEl, dayNavEl, tabBarEl) {
+  // 다른 탭을 보고 있을 때는 일정 패널이 display:none이라 좌표가 전부 0으로 나온다.
+  // 그대로 계산하면 마지막 날짜가 활성으로 잡히므로 아무것도 건드리지 않는다.
+  if (!dayListEl.offsetParent) return;
+
+  const cards = [...dayListEl.querySelectorAll('.day-card')];
+  if (cards.length === 0) return;
+
+  const stickyOffset = getStickyOffset(dayNavEl, tabBarEl);
+  // 헤더 아래로 아직 끝나지 않은(= 화면에 걸쳐 있는) 첫 카드가 지금 보고 있는 날짜다.
+  // 맨 아래까지 스크롤해 그런 카드가 없으면 마지막 날짜를 활성으로 둔다.
+  const activeCard = cards.find((card) => card.getBoundingClientRect().bottom > stickyOffset) || cards.at(-1);
+  setActiveDayPill(dayNavEl, activeCard.id);
+}
+
+/**
  * 일정 카드 목록을 관찰해 현재 스크롤 위치에 해당하는 날짜의 pill을 활성 표시한다.
  * sticky 헤더(탭바 + 날짜 네비게이션) 높이만큼 관찰 영역 상단을 잘라내, 그 아래
  * 뷰포트에 걸쳐 있는 카드 중 DOM 순서상 가장 위(=가장 먼저 보이는 날짜)를 활성으로 삼는다.
@@ -20,7 +56,7 @@ export function setupScrollSpy(dayListEl, dayNavEl, tabBarEl) {
   const cards = [...dayListEl.querySelectorAll('.day-card')];
   if (cards.length === 0) return;
 
-  const stickyOffset = tabBarEl.offsetHeight + dayNavEl.offsetHeight;
+  const stickyOffset = getStickyOffset(dayNavEl, tabBarEl);
 
   // entries에는 이번 콜백에서 "새로 바뀐" 요소만 담기므로, 현재 교차 상태는
   // 콜백을 넘나들며 누적되는 이 집합으로 계속 추적해야 한다. entries만 보고
@@ -51,4 +87,7 @@ export function setupScrollSpy(dayListEl, dayNavEl, tabBarEl) {
   );
 
   cards.forEach((card) => observer.observe(card));
+
+  // 관찰의 첫 콜백에만 의존하면 스크롤하기 전까지 하이라이트가 비어 있으므로 지금 한 번 맞춘다.
+  updateActiveDayPill(dayListEl, dayNavEl, tabBarEl);
 }
