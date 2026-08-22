@@ -11,7 +11,19 @@ import {
   MEMO_TABLE_DEFAULT_ROWS,
 } from './constants.js';
 
-/** 표 붙여넣기에서 열을 나누는 문자. 엑셀/구글 스프레드시트는 셀 사이를 탭으로 구분해 복사한다. */
+/**
+ * 붙여넣은 텍스트를 열로 나누는 방식.
+ * 앱마다 클립보드에 담아주는 형식이 달라서(특히 휴대폰의 스프레드시트 앱) 사용자가 고를 수 있게 한다.
+ * 금액에 흔히 들어가는 쉼표(120,000) 때문에 쉼표는 자동으로 고르지 않고 직접 선택해야 한다.
+ */
+export const TABLE_TEXT_SEPARATORS = [
+  { value: 'auto', label: '자동' },
+  { value: 'tab', label: '탭' },
+  { value: 'comma', label: '쉼표' },
+  { value: 'space', label: '공백' },
+];
+
+/** 엑셀/구글 스프레드시트가 셀 사이를 구분해 복사할 때 쓰는 문자 */
 const CLIPBOARD_COLUMN_SEPARATOR = '\t';
 
 /**
@@ -91,6 +103,15 @@ export function createEmptyTable(rowCount = MEMO_TABLE_DEFAULT_ROWS, columnCount
 }
 
 /**
+ * 이미 만들어진 2차원 배열로 표를 만든다.
+ * @param {string[][]} rows
+ * @returns {{ id: string, rows: string[][] }}
+ */
+export function createTableFromRows(rows) {
+  return { id: crypto.randomUUID(), rows };
+}
+
+/**
  * 모든 행의 길이를 가장 긴 행에 맞춰 빈 칸으로 채운다.
  * 붙여넣은 표는 행마다 열 수가 다를 수 있는데, 그대로 두면 표가 어긋나게 그려진다.
  * @param {string[][]} rows
@@ -102,19 +123,51 @@ export function normalizeTableRows(rows) {
 }
 
 /**
- * 엑셀/구글 스프레드시트에서 복사한 텍스트를 표(2차원 배열)로 바꾼다.
- * 셀 하나만 복사한 경우(줄바꿈·탭이 없는 경우)는 표가 아니라 평범한 글자 입력이므로 null을 돌려준다.
+ * 한 줄을 선택한 방식으로 열로 나눈다.
+ * @param {string} line
+ * @param {string} separator - TABLE_TEXT_SEPARATORS의 value ('auto'는 이미 결정된 뒤라 오지 않는다)
+ * @returns {string[]}
+ */
+function splitLine(line, separator) {
+  if (separator === 'tab') return line.split(CLIPBOARD_COLUMN_SEPARATOR);
+  if (separator === 'comma') return line.split(',');
+  if (separator === 'space') return line.trim().split(/\s+/);
+  return [line];
+}
+
+/**
+ * 붙여넣은 텍스트를 표(2차원 배열)로 바꾼다.
+ * 'auto'는 탭이 하나라도 보이면 탭으로 나누고, 아니면 줄바꿈만 살려 한 열짜리 표로 만든다.
+ * 쉼표·공백은 금액이나 띄어쓴 이름을 잘못 쪼갤 수 있어 사용자가 직접 고를 때만 쓴다.
+ * @param {string} text
+ * @param {string} [separator] - TABLE_TEXT_SEPARATORS의 value
+ * @returns {string[][] | null} 내용이 없으면 null
+ */
+export function parseTableText(text, separator = 'auto') {
+  if (!text) return null;
+
+  const lines = text
+    .replace(/\r\n?/g, '\n')
+    .split('\n')
+    .filter((line) => line.trim() !== '');
+  if (lines.length === 0) return null;
+
+  const resolved =
+    separator === 'auto' ? (lines.some((line) => line.includes(CLIPBOARD_COLUMN_SEPARATOR)) ? 'tab' : 'none') : separator;
+
+  return normalizeTableRows(lines.map((line) => splitLine(line, resolved)));
+}
+
+/**
+ * 표 칸에 직접 붙여넣은 내용을 표로 바꾼다.
+ * 칸 하나 분량(줄바꿈·탭이 없는 글자)은 평범한 붙여넣기이므로 표로 만들지 않는다.
  * @param {string} text - 붙여넣기 이벤트의 'text/plain' 값
  * @returns {string[][] | null}
  */
 export function parseClipboardTable(text) {
-  if (!text) return null;
-
-  const lines = text.replace(/\r\n?/g, '\n').replace(/\n$/, '').split('\n');
-  const hasMultipleCells = lines.length > 1 || lines[0].includes(CLIPBOARD_COLUMN_SEPARATOR);
-  if (!hasMultipleCells) return null;
-
-  return normalizeTableRows(lines.map((line) => line.split(CLIPBOARD_COLUMN_SEPARATOR)));
+  const rows = parseTableText(text, 'auto');
+  if (!rows) return null;
+  return rows.length === 1 && rows[0].length === 1 ? null : rows;
 }
 
 /**
