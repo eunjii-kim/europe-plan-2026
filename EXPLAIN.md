@@ -34,6 +34,11 @@ index.html
        │    └─ js/firebaseConfig.js
        ├─ js/checklist.js       (Firestore CRUD - 체크리스트 섹션/준비물)
        │    └─ js/firebaseConfig.js
+       ├─ js/memos.js           (Firestore CRUD - 메모)
+       │    └─ js/firebaseConfig.js
+       ├─ js/memoEditor.js      (메모 사진/표 편집 UI - 글쓰기·수정 폼 공용)
+       │    └─ js/memoAttachments.js
+       ├─ js/memoAttachments.js (사진 압축 / 표 붙여넣기 파싱 / 용량 검사)
        └─ js/firebaseConfig.js  (Firebase 초기화)
             └─ js/constants.js
 ```
@@ -57,6 +62,9 @@ index.html
 - **`js/expenses.js`**: 소비기록(`expenses`) 실시간 구독/추가/삭제 함수를 제공한다. Firestore 쿼리에서 `date` 오름차순으로 정렬해 가져온다. 각 기록은 몇 명이 함께 결제했는지(`headcount`, 기본값 1)도 저장한다 — 추후 1인당 지출 계산의 기반이 된다(현재는 저장/표시만 하고 통계 계산에는 아직 반영하지 않음).
 - **`js/customRegions.js`**: `places.js`와 동일한 최소 패턴으로, 사용자가 지역 select의 "+ 새 지역 추가"로 등록한 지역/도시(`customRegions`) 실시간 구독/추가 함수를 제공한다(수정/삭제는 지원하지 않음).
 - **`js/checklist.js`**: 체크리스트 탭의 섹션(`checklistSections`)과 섹션별 준비물(`checklistItems`) 두 서브컬렉션 모두 실시간 구독/추가/삭제 함수를 제공하고, 준비물의 체크 여부(`toggleChecklistItem`)와 메모(`updateChecklistItemMemo`)를 수정하는 함수도 따로 둔다. 두 컬렉션으로 나눈 이유는 섹션 자체는 제목만 있고, 준비물은 어느 섹션 소속인지(`sectionId`)를 참조로만 가지는 평평한(flat) 구조가 Firestore 실시간 구독 패턴과 맞기 때문이다. 섹션을 삭제하면 Firestore가 하위 문서를 자동으로 지우지 않으므로, `app.js`가 그 섹션에 속한 준비물들을 먼저 각각 지운 뒤 섹션을 지운다.
+- **`js/memos.js`**: 메모(`memos`) 실시간 구독/추가/수정/삭제 함수를 제공한다. 사진(`images`)은 압축된 data URL 문자열로, 표(`tables`)는 문서 필드로 함께 저장된다. Firestore가 배열 안의 배열을 저장하지 못하므로, 표의 각 행은 `{ cells: [...] }` 객체로 한 겹 감싸 저장했다가(`toStoredTables`) 읽을 때 다시 2차원 배열로 되돌린다(`fromStoredTables`) — 이 변환은 이 파일 안에서만 일어나고, 나머지 코드는 항상 평범한 2차원 배열만 다룬다.
+- **`js/memoAttachments.js`**: 메모 첨부의 순수 로직. 기기에서 고른 사진을 canvas로 줄여 JPEG data URL로 만들고(`compressImageFile`), 엑셀/스프레드시트에서 복사한 텍스트를 표로 바꾸며(`parseClipboardTable`), 저장 전 메모 전체 용량이 Firestore 문서 한도 안에 드는지 검사한다(`measureMemoSize`).
+- **`js/memoEditor.js`**: 메모의 사진/표 편집 UI. "+ 글쓰기" 폼(`app.js`가 `index.html`의 자리에 끼워 넣음)과 카드 인라인 수정 폼(`render.js`)이 똑같은 편집기를 써야 해서 별도 모듈로 뒀다. `budget.js`의 예산 편집 섹션과 같은 `{ element, collect() }` 패턴을 따른다.
 - **`js/app.js`**: 위 모듈들을 조립하는 오케스트레이터. 탭 전환(일정/예산/정보/소비기록/체크리스트), 라이트/다크 테마 토글, 편집모드 토글, 모두 펼치기/접기, 환율 조회 및 1시간 자동 갱신, 초기 렌더링, 예산/일정/정보/소비기록/체크리스트 폼 이벤트, Firestore 구독(예산 항목/비용 수정값/일정 수정값/추가 일정/장소/지출/커스텀 지역/체크리스트 섹션·준비물)을 연결한다. `itineraryData`에서 뽑은 지역 목록(`EXCLUDED_REGIONS`로 일부 제외)과 `customRegions`를 합쳐 정보·소비기록 폼의 지역 select를 채우고, select 맨 아래 "+ 새 지역 추가"를 고르면 이름을 입력받아 `customRegions`에 저장한 뒤 새 값을 자동 선택한다. 페이지 로드 시 가장 먼저 실행된다.
 
 ## 설계 메모
@@ -69,3 +77,4 @@ index.html
 - **편집모드**: 테마와 마찬가지로 `localStorage`에 저장해 다음 방문에도 유지된다(여행 준비 기간 동안 계속 켜놓고 쓰는 상황을 고려). `<body class="edit-mode">`로 켜짐/꺼짐을 표시하며, 편집 UI는 CSS로 숨기는 대신 JS에서 `editMode` 인자에 따라 아예 렌더링 여부를 분기한다.
 - **로깅 트레이드오프**: 서버가 없는 정적 프론트엔드라 별도 로깅 라이브러리는 과한 선택이라 판단했다. Firestore/환율 API 호출 실패 시 `console.error`로 최소한의 디버그 정보만 남기고, 사용자에게는 화면 배너로 안내한다.
 - **정보/소비기록의 지역 필드**: 두 폼 모두 지역을 직접 타이핑하지 않고 `itineraryData`에서 뽑은 지역 목록(select)에서만 고르게 했다 — 오타로 인해 통계 집계에서 값이 갈라지는 걸 막기 위해서다. 국가별 통계(`groupExpenseByCountry`)는 이 지역명을 `SWISS_REGIONS`로 다시 판별하므로, 일정표에 새 지역이 추가되면 소비기록의 지역 select와 국가 통계에도 자동으로 반영된다. `EXCLUDED_REGIONS`(남부투어/자유일정/로마 → 인천)는 일정표 자체에는 남겨두되(날짜 카드 표시·그룹핑용) 정보/소비기록의 지역 선택지에서만 걸러낸다 — 실제 장소/지출을 기록할 "지역"으로 부적절하기 때문이다. 오타 방지 원칙과 사용자가 목록에 없는 새 도시를 기록해야 하는 경우가 상충해서, select 맨 아래 "+ 새 지역 추가"로 이름을 입력받아 `customRegions` 컬렉션에 저장하고 두 select 모두에 실시간 반영되게 절충했다.
+- **메모의 사진/표 저장 방식**: Firebase Storage가 유료 요금제 전용이라 파일 저장소를 쓸 수 없어서, 메모 사진은 브라우저에서 가로/세로 1200px·JPEG 품질 0.7로 줄인 뒤 data URL로 메모 문서 안에 직접 넣는다. 대신 Firestore 문서 한도(1MiB)를 사진과 나눠 쓰게 되므로, 저장을 시도했다가 실패하는 대신 `measureMemoSize`로 미리 재서 `MEMO_MAX_BYTES`(0.9MB)를 넘으면 이유를 안내하고 저장을 막는다. 표는 Firestore가 배열 안의 배열을 저장하지 못한다는 제약 때문에 각 행을 `{ cells: [...] }`로 감싸 저장하며, 이 변환은 `memos.js` 안에만 가둬 두고 나머지 코드는 2차원 배열만 다룬다. 편집 UI(`memoEditor.js`)를 글쓰기 폼과 인라인 수정 폼이 공유하는 것도 같은 이유다 — 두 곳에 같은 편집기를 따로 만들면 붙여넣기 파싱 같은 규칙이 어긋나기 쉽다.

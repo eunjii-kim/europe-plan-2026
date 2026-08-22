@@ -16,6 +16,7 @@ import {
   groupExpenseByCountry,
   UNSPECIFIED_REGION_LABEL,
 } from './expenseCalc.js';
+import { createMemoAttachmentsEditor } from './memoEditor.js';
 
 /**
  * 'YYYY-MM-DD' 문자열을 시간대 이슈 없이 로컬 Date로 변환한다.
@@ -2104,8 +2105,56 @@ document.addEventListener('click', (event) => {
 });
 
 /**
+ * 메모에 붙은 표 하나를 읽기 전용으로 그린다. 첫 행은 머리글이다.
+ * 열이 많으면 카드를 넘치게 하지 않고 표 안에서만 가로로 스크롤된다.
+ * @param {{ rows: string[][] }} table
+ * @returns {HTMLElement}
+ */
+function renderMemoTable(table) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'memo-table-wrapper';
+
+  const tableEl = document.createElement('table');
+  tableEl.className = 'memo-table';
+
+  table.rows.forEach((row, rowIndex) => {
+    const tr = document.createElement('tr');
+    row.forEach((cell) => {
+      const cellEl = document.createElement(rowIndex === 0 ? 'th' : 'td');
+      cellEl.textContent = cell;
+      tr.appendChild(cellEl);
+    });
+    tableEl.appendChild(tr);
+  });
+
+  wrapper.appendChild(tableEl);
+  return wrapper;
+}
+
+/**
+ * 메모의 사진 목록을 그린다.
+ * @param {Array<{ id: string, dataUrl: string, name: string }>} images
+ * @param {string} className - 'memo-item-images'(카드 미리보기) 또는 'memo-detail-images'(상세 보기)
+ * @returns {HTMLElement}
+ */
+function renderMemoImages(images, className) {
+  const list = document.createElement('ul');
+  list.className = className;
+  images.forEach((image) => {
+    const li = document.createElement('li');
+    const img = document.createElement('img');
+    img.src = image.dataUrl;
+    img.alt = image.name || '첨부 사진';
+    img.loading = 'lazy';
+    li.appendChild(img);
+    list.appendChild(li);
+  });
+  return list;
+}
+
+/**
  * 메모 카드를 클릭했을 때 전체 내용을 화면 중앙에 확대해서 보여주는 모달의 DOM(지연 생성 싱글턴).
- * @type {{ modal: HTMLElement, title: HTMLElement, content: HTMLElement } | null}
+ * @type {{ modal: HTMLElement, title: HTMLElement, content: HTMLElement, attachments: HTMLElement } | null}
  */
 let memoDetailModalRefs = null;
 
@@ -2143,7 +2192,10 @@ function ensureMemoDetailModal() {
   const content = document.createElement('p');
   content.className = 'memo-detail-content';
 
-  card.append(closeButton, title, content);
+  const attachments = document.createElement('div');
+  attachments.className = 'memo-detail-attachments';
+
+  card.append(closeButton, title, content, attachments);
   modal.append(backdrop, card);
   document.body.appendChild(modal);
 
@@ -2151,27 +2203,36 @@ function ensureMemoDetailModal() {
     if (event.key === 'Escape') closeMemoDetailModal();
   });
 
-  memoDetailModalRefs = { modal, title, content };
+  memoDetailModalRefs = { modal, title, content, attachments };
   return memoDetailModalRefs;
 }
 
 /**
- * 메모 카드 클릭 시 전체 내용을 화면 중앙에 확대해서 보여준다.
- * @param {{ title: string, content: string }} item
+ * 메모 카드 클릭 시 전체 내용(사진·표 포함)을 화면 중앙에 확대해서 보여준다.
+ * @param {{ title: string, content: string, images: Array, tables: Array }} item
  */
 function openMemoDetailModal(item) {
   const refs = ensureMemoDetailModal();
   refs.title.textContent = item.title;
   refs.content.textContent = item.content || '';
   refs.content.hidden = !item.content;
+
+  // 카드에서는 사진을 썸네일로만 보여주므로, 여기서 원래 크기로 다시 그린다.
+  refs.attachments.innerHTML = '';
+  const images = item.images || [];
+  if (images.length > 0) {
+    refs.attachments.appendChild(renderMemoImages(images, 'memo-detail-images'));
+  }
+  (item.tables || []).forEach((table) => refs.attachments.appendChild(renderMemoTable(table)));
+
   refs.modal.hidden = false;
 }
 
 /**
  * 메모 카드를 그 자리에서 바로 수정할 수 있는 인라인 폼을 만든다. 줄바꿈이 가능한 textarea를 쓴다.
  * 별도 화면/영역이 추가되는 게 아니라 카드의 제목/내용 표시를 그대로 대체한다.
- * @param {{ title: string, content: string }} item
- * @param {(values: { title: string, content: string }) => void} onSave
+ * @param {{ title: string, content: string, images: Array, tables: Array }} item
+ * @param {(values: { title: string, content: string, images: Array, tables: Array }) => void} onSave
  * @param {() => void} onCancel
  * @returns {HTMLFormElement}
  */
@@ -2181,17 +2242,27 @@ function renderMemoEditForm(item, onSave, onCancel) {
   form.innerHTML = `
     <input type="text" name="title" value="${escapeHtml(item.title)}" placeholder="제목" aria-label="제목" required maxlength="100" />
     <textarea name="content" placeholder="내용을 입력하세요" aria-label="내용" maxlength="5000">${escapeHtml(item.content || '')}</textarea>
-    <div class="memo-form-actions">
-      <button type="submit">저장</button>
-      <button type="button" class="memo-edit-cancel-button">취소</button>
-    </div>
   `;
+
+  // 사진/표 편집기는 "+ 글쓰기" 폼과 똑같은 것을 쓴다(memoEditor.js).
+  const attachments = createMemoAttachmentsEditor({ images: item.images || [], tables: item.tables || [] });
+  form.appendChild(attachments.element);
+
+  const actions = document.createElement('div');
+  actions.className = 'memo-form-actions';
+  actions.innerHTML = `
+    <button type="submit">저장</button>
+    <button type="button" class="memo-edit-cancel-button">취소</button>
+  `;
+  form.appendChild(actions);
+
   form.addEventListener('submit', (event) => {
     event.preventDefault();
     const data = new FormData(form);
     onSave({
       title: data.get('title').trim(),
       content: data.get('content').trim(),
+      ...attachments.collect(),
     });
   });
   form.querySelector('.memo-edit-cancel-button').addEventListener('click', () => onCancel());
@@ -2202,11 +2273,11 @@ function renderMemoEditForm(item, onSave, onCancel) {
  * 메모 목록을 렌더링한다. 카드를 길게 누르면 수정/삭제 메뉴가 뜨고, 수정을 고르면 그 카드가
  * 바로 편집 폼으로 바뀐다(별도 영역이 아래에 추가되지 않음).
  * @param {HTMLElement} listEl
- * @param {Array<{ id: string, title: string, content: string }>} items
+ * @param {Array<{ id: string, title: string, content: string, images: Array, tables: Array }>} items
  * @param {string | null} editingId - 현재 인라인 편집 중인 메모 id (없으면 null)
  * @param {{
  *   onDelete: (id: string) => void,
- *   onSave: (id: string, values: { title: string, content: string }) => void,
+ *   onSave: (id: string, values: { title: string, content: string, images: Array, tables: Array }) => void,
  *   onStartEdit: (id: string) => void,
  *   onCancelEdit: () => void,
  * }} handlers
@@ -2247,6 +2318,21 @@ export function renderMemoList(listEl, items, editingId, handlers) {
       content.className = 'memo-item-content';
       content.textContent = item.content;
       li.appendChild(content);
+    }
+
+    // 카드는 어디까지나 미리보기라 내용이 7줄로 잘린다. 사진은 썸네일로, 표는 개수만 알려주고
+    // 전체는 카드를 눌러 여는 상세 보기에서 보여준다.
+    const images = item.images || [];
+    if (images.length > 0) {
+      li.appendChild(renderMemoImages(images, 'memo-item-images'));
+    }
+
+    const tables = item.tables || [];
+    if (tables.length > 0) {
+      const tableBadge = document.createElement('p');
+      tableBadge.className = 'memo-item-table-badge';
+      tableBadge.textContent = `표 ${tables.length}개`;
+      li.appendChild(tableBadge);
     }
 
     const actionsEl = document.createElement('div');
