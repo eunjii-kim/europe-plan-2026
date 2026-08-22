@@ -95,6 +95,15 @@ export const ADD_NEW_REGION_VALUE = '__add_new_region__';
 /** 분류 select 맨 아래 "+ 새 분류 추가" 옵션에 쓰는 sentinel value */
 export const ADD_NEW_CATEGORY_VALUE = '__add_new_category__';
 
+/** 페이지를 처음 열었을 때 선택되어 있는 탭 (index.html의 aria-selected와 일치해야 한다) */
+export const DEFAULT_TAB = 'schedule';
+
+/**
+ * 탭 전환 후 스크롤 위치를 복원할 때 "이미 복원됐다"고 볼 오차(px).
+ * 스크롤 값이 소수점으로 잡히는 경우가 있어 정확히 일치하는지로 판단하지 않는다.
+ */
+export const SCROLL_RESTORE_TOLERANCE_PX = 2;
+
 /** localStorage에 라이트/다크 테마 선택값을 저장할 때 쓰는 키 */
 export const THEME_STORAGE_KEY = 'europePlan2026:theme';
 
