@@ -9,6 +9,8 @@ import {
   ADD_NEW_CATEGORY_VALUE,
   PLACE_CATEGORIES,
   PLACE_CATEGORY_ICONS,
+  DEFAULT_TAB,
+  SCROLL_RESTORE_TOLERANCE_PX,
 } from './constants.js';
 import { getExchangeRates } from './exchangeRate.js';
 import {
@@ -97,7 +99,12 @@ function setupEnterKeyGuard() {
   });
 }
 
-/** 탭 버튼과 패널을 서로 연결한다. */
+/**
+ * 탭 버튼과 패널을 서로 연결한다.
+ * 탭을 떠날 때 현재 스크롤 위치를 기억해 두었다가 다시 돌아오면 그대로 복원한다.
+ * 이 처리가 없으면 메모처럼 짧은 탭으로 갔을 때 문서 높이가 줄면서 브라우저가
+ * 스크롤을 맨 위로 잘라내고, 일정 탭으로 돌아왔을 때 항상 첫 번째 날짜가 보인다.
+ */
 function setupTabs() {
   const buttons = document.querySelectorAll('.tab-button');
   const panels = {
@@ -108,13 +115,39 @@ function setupTabs() {
     checklist: document.getElementById('checklistTab'),
     memo: document.getElementById('memoTab'),
   };
+  const scrollPositions = {};
+  let activeTab = DEFAULT_TAB;
+
   buttons.forEach((button) => {
     button.addEventListener('click', () => {
+      const nextTab = button.dataset.tab;
+      if (nextTab === activeTab) return;
+
+      scrollPositions[activeTab] = window.scrollY;
+      activeTab = nextTab;
+
       buttons.forEach((b) => b.setAttribute('aria-selected', String(b === button)));
       Object.entries(panels).forEach(([key, panel]) => {
-        panel.hidden = key !== button.dataset.tab;
+        panel.hidden = key !== nextTab;
       });
+
+      restoreTabScroll(scrollPositions[nextTab] || 0);
     });
+  });
+}
+
+/**
+ * 탭을 전환한 직후 저장해 둔 스크롤 위치로 되돌린다.
+ * 패널을 막 보이게 한 시점에는 아직 문서 높이가 반영되지 않아 한 번에 복원되지 않을 수 있으므로,
+ * 다음 프레임에 한 번 더 시도한다.
+ * @param {number} scrollY
+ */
+function restoreTabScroll(scrollY) {
+  window.scrollTo(0, scrollY);
+  requestAnimationFrame(() => {
+    if (Math.abs(window.scrollY - scrollY) > SCROLL_RESTORE_TOLERANCE_PX) {
+      window.scrollTo(0, scrollY);
+    }
   });
 }
 
