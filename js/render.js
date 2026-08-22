@@ -110,93 +110,158 @@ function formatCostBadge(item, rates) {
 }
 
 /**
- * 비용 항목 하나의 인라인 수정 폼을 만든다.
- * @param {object} item
- * @param {(key: string, values: { amount: number, currency: string, headcount: number }) => void} onEdit
- * @returns {HTMLFormElement}
+ * 예산 행을 저장할 때 어떻게 처리할지 나타내는 표시.
+ * 저장 버튼을 누르기 전까지는 화면에서만 표시해 두었다가, 저장 시 한 번에 반영한다.
  */
-function renderCostItemEditForm(item, onEdit) {
-  const form = document.createElement('form');
-  form.className = 'cost-item-edit-form';
-  form.innerHTML = `
-    <input type="number" name="amount" value="${item.amount}" min="0" step="1" aria-label="금액" />
-    <select name="currency" aria-label="화폐">
-      <option value="KRW" ${item.currency === 'KRW' ? 'selected' : ''}>KRW</option>
-      <option value="EUR" ${item.currency === 'EUR' ? 'selected' : ''}>EUR</option>
-      <option value="CHF" ${item.currency === 'CHF' ? 'selected' : ''}>CHF</option>
-    </select>
-    <input type="number" name="headcount" value="${item.headcount}" min="1" step="1" aria-label="인원" />
-    <button type="submit">저장</button>
-  `;
-  form.addEventListener('submit', (event) => {
-    event.preventDefault();
-    const data = new FormData(form);
-    onEdit(item.key, {
-      category: item.category,
-      amount: Number(data.get('amount')),
-      currency: data.get('currency'),
-      headcount: Number(data.get('headcount')) || 1,
-    });
-  });
-  return form;
+const BUDGET_ROW_INTENT = {
+  /** 입력한 값 그대로 저장한다 */
+  save: 'save',
+  /** 수정값을 지워 data.js의 원래 금액으로 되돌린다 */
+  reset: 'reset',
+};
+
+/** 예산 행에서 고를 수 있는 화폐 목록 */
+const BUDGET_CURRENCIES = ['KRW', 'EUR', 'CHF'];
+
+/** 새로 추가하는 예산 행의 기본값 */
+const NEW_BUDGET_ITEM = { category: '기타', amount: '', currency: 'KRW', headcount: 1 };
+
+/**
+ * 예산 행 하나에 입력된 값을 읽는다.
+ * @param {HTMLElement} row
+ * @returns {{ category: string, amount: number, currency: string, headcount: number }}
+ */
+function readBudgetRow(row) {
+  return {
+    category: row.querySelector('[name="category"]').value,
+    amount: Number(row.querySelector('[name="amount"]').value),
+    currency: row.querySelector('[name="currency"]').value,
+    headcount: Number(row.querySelector('[name="headcount"]').value) || 1,
+  };
 }
 
 /**
- * 비용이 없던 블록에 새 비용 항목을 추가하는 인라인 폼을 만든다.
- * @param {(values: { category: string, amount: number, currency: string, headcount: number }) => void} onAdd
+ * 예산 행 하나(분류/금액/화폐/인원 + 삭제)를 만든다.
+ * @param {object} item - 기존 비용 항목. 새로 추가하는 행이면 key가 없다.
+ * @param {(row: HTMLElement) => void} onRemove - × 버튼을 눌렀을 때 행을 목록에서 빼는 동작
  * @returns {HTMLElement}
  */
-function renderAddCostItemForm(onAdd) {
-  const wrapper = document.createElement('div');
-  wrapper.className = 'cost-item-add-section';
+function renderBudgetEditRow(item, onRemove) {
+  const row = document.createElement('div');
+  row.className = 'budget-edit-row';
+  row.dataset.intent = BUDGET_ROW_INTENT.save;
+  if (item.key) row.dataset.key = item.key;
 
-  const form = document.createElement('form');
-  form.className = 'cost-item-edit-form';
-  form.hidden = true;
-  const categoryOptions = Object.keys(CATEGORY_ICONS)
-    .map((category) => `<option value="${category}" ${category === '기타' ? 'selected' : ''}>${CATEGORY_ICONS[category]} ${category}</option>`)
+  // data.js에 없는 분류가 저장돼 있을 수 있으므로 현재 값도 선택지에 반드시 넣는다.
+  const categories = [...new Set([...Object.keys(CATEGORY_ICONS), item.category])];
+  const categoryOptions = categories
+    .map((category) => `<option value="${escapeHtml(category)}" ${category === item.category ? 'selected' : ''}>${CATEGORY_ICONS[category] || DEFAULT_CATEGORY_ICON} ${escapeHtml(category)}</option>`)
     .join('');
-  form.innerHTML = `
+  const currencyOptions = BUDGET_CURRENCIES.map(
+    (currency) => `<option value="${currency}" ${currency === item.currency ? 'selected' : ''}>${currency}</option>`,
+  ).join('');
+
+  row.innerHTML = `
     <select name="category" aria-label="분류">${categoryOptions}</select>
-    <input type="number" name="amount" placeholder="금액" min="0" step="1" aria-label="금액" required />
-    <select name="currency" aria-label="화폐">
-      <option value="KRW">KRW</option>
-      <option value="EUR">EUR</option>
-      <option value="CHF">CHF</option>
-    </select>
-    <input type="number" name="headcount" value="1" min="1" step="1" aria-label="인원" />
-    <button type="submit">추가</button>
+    <input type="number" name="amount" value="${item.amount}" placeholder="총 금액" min="0" step="any" aria-label="총 금액" required />
+    <select name="currency" aria-label="화폐">${currencyOptions}</select>
+    <input type="number" name="headcount" value="${item.headcount}" min="1" step="1" aria-label="인원" />
+    <button type="button" class="budget-edit-remove-button" aria-label="예산 삭제">${ICONS.x}</button>
   `;
-  form.addEventListener('submit', (event) => {
-    event.preventDefault();
-    const data = new FormData(form);
-    onAdd({
-      category: data.get('category'),
-      amount: Number(data.get('amount')),
-      currency: data.get('currency'),
-      headcount: Number(data.get('headcount')) || 1,
+
+  // 저장 시 "실제로 바뀐 행만" 쓰기 위한 기준값. 이게 없으면 제목만 고쳐도 모든 예산이
+  // 수정된 것으로 표시돼 원본과 달라진 항목을 구분할 수 없게 된다.
+  row.dataset.original = JSON.stringify(readBudgetRow(row));
+
+  row.querySelector('.budget-edit-remove-button').addEventListener('click', () => onRemove(row));
+
+  if (item.overridden) {
+    const reset = document.createElement('button');
+    reset.type = 'button';
+    reset.className = 'budget-edit-reset-button';
+    reset.innerHTML = `${ICONS.rotateCcw} 원래대로`;
+    reset.addEventListener('click', () => {
+      row.dataset.intent = BUDGET_ROW_INTENT.reset;
+      row.querySelector('[name="amount"]').value = item.original.amount;
+      row.querySelector('[name="currency"]').value = item.original.currency;
+      row.querySelector('[name="headcount"]').value = item.original.headcount;
+      reset.hidden = true;
     });
-    form.reset();
-    form.hidden = true;
-  });
+    // 되돌린 뒤 값을 다시 손대면 그건 더 이상 "원래대로"가 아니라 새 수정이다.
+    row.addEventListener('input', () => {
+      row.dataset.intent = BUDGET_ROW_INTENT.save;
+      reset.hidden = false;
+    });
+    row.appendChild(reset);
+  }
 
-  const toggleButton = document.createElement('button');
-  toggleButton.type = 'button';
-  toggleButton.className = 'cost-item-add-button';
-  toggleButton.textContent = '+ 비용 추가';
-  toggleButton.addEventListener('click', () => {
-    form.hidden = !form.hidden;
-  });
-
-  wrapper.appendChild(toggleButton);
-  wrapper.appendChild(form);
-  return wrapper;
+  return row;
 }
 
 /**
- * 일정 블록의 시간/제목/메모를 그 자리에서 바로 고치는 인라인 폼을 만든다.
- * @param {{ time: string, title: string, note: string }} block
- * @param {(values: { time: string, title: string, note: string }) => void} onSave
+ * 일정 수정 폼 안에 들어가는 예산 편집 섹션을 만든다.
+ * 기존 항목 수정 · 삭제 · 새 항목 추가를 모두 여기서 하고, 실제 저장은 폼 저장 시 한 번에 일어난다.
+ * @param {Array<object>} costItems - applyBudgetOverrides/applyCustomCostItems까지 적용된 비용 항목
+ * @returns {{ element: HTMLElement, collect: () => { items: Array, removedItems: Array, resetKeys: string[] } }}
+ */
+function renderBudgetEditSection(costItems) {
+  const section = document.createElement('div');
+  section.className = 'budget-edit-section';
+
+  const label = document.createElement('span');
+  label.className = 'budget-edit-label';
+  label.textContent = '예산';
+  section.appendChild(label);
+
+  const list = document.createElement('div');
+  list.className = 'budget-edit-list';
+  section.appendChild(list);
+
+  /** 화면에서 뺀 기존 항목들. 저장할 때 삭제 처리한다. */
+  const removedItems = [];
+  const removeRow = (row) => {
+    if (row.dataset.key) {
+      removedItems.push({ key: row.dataset.key, ...readBudgetRow(row) });
+    }
+    row.remove();
+  };
+
+  costItems.forEach((item) => list.appendChild(renderBudgetEditRow(item, removeRow)));
+
+  const addButton = document.createElement('button');
+  addButton.type = 'button';
+  addButton.className = 'budget-edit-add-button';
+  addButton.textContent = '+ 예산 추가';
+  addButton.addEventListener('click', () => {
+    list.appendChild(renderBudgetEditRow(NEW_BUDGET_ITEM, removeRow));
+  });
+  section.appendChild(addButton);
+
+  return {
+    element: section,
+    collect: () => {
+      const items = [];
+      const resetKeys = [];
+      list.querySelectorAll('.budget-edit-row').forEach((row) => {
+        if (row.dataset.intent === BUDGET_ROW_INTENT.reset) {
+          resetKeys.push(row.dataset.key);
+          return;
+        }
+        const values = readBudgetRow(row);
+        // 손대지 않은 기존 항목까지 저장하면 전부 "수정됨"으로 표시되므로 건너뛴다.
+        if (row.dataset.key && row.dataset.original === JSON.stringify(values)) return;
+        items.push(row.dataset.key ? { key: row.dataset.key, ...values } : values);
+      });
+      return { items, removedItems, resetKeys };
+    },
+  };
+}
+
+/**
+ * 일정 블록의 시간/제목/메모/예산을 그 자리에서 바로 고치는 인라인 폼을 만든다.
+ * 예산도 이 폼 안에서 수정·추가·삭제하고, 저장 버튼을 누를 때 함께 반영된다.
+ * @param {object} block - costItems를 포함한 병합 완료 블록
+ * @param {(values: { time: string, title: string, note: string, budget: object }) => void} onSave
  * @param {() => void} onCancel
  * @returns {HTMLFormElement}
  */
@@ -207,11 +272,19 @@ function renderTimeBlockEditForm(block, onSave, onCancel) {
     <input type="text" name="time" value="${escapeHtml(block.time)}" placeholder="시간 (예: 09:00)" aria-label="시간" required />
     <input type="text" name="title" value="${escapeHtml(block.title)}" placeholder="제목" aria-label="제목" required />
     <textarea name="note" placeholder="메모" aria-label="메모">${escapeHtml(block.note || '')}</textarea>
-    <div class="time-block-edit-form-actions">
-      <button type="submit">저장</button>
-      <button type="button" class="time-block-edit-cancel-button">취소</button>
-    </div>
   `;
+
+  const budget = renderBudgetEditSection(block.costItems || []);
+  form.appendChild(budget.element);
+
+  const actions = document.createElement('div');
+  actions.className = 'time-block-edit-form-actions';
+  actions.innerHTML = `
+    <button type="submit">저장</button>
+    <button type="button" class="time-block-edit-cancel-button">취소</button>
+  `;
+  form.appendChild(actions);
+
   form.addEventListener('submit', (event) => {
     event.preventDefault();
     const data = new FormData(form);
@@ -219,6 +292,7 @@ function renderTimeBlockEditForm(block, onSave, onCancel) {
       time: data.get('time').trim(),
       title: data.get('title').trim(),
       note: data.get('note').trim(),
+      budget: budget.collect(),
     });
   });
   form.querySelector('.time-block-edit-cancel-button').addEventListener('click', () => onCancel());
@@ -771,62 +845,19 @@ function renderTimeBlock(block, rates, handlers, context) {
 
     more.appendChild(renderAttachmentsSection(block, handlers));
 
+    // 예산 편집은 길게 누르기 → 수정 폼 한 곳으로 모았으므로 여기서는 내역만 보여준다.
     if (block.costItems && block.costItems.length > 0) {
       const costList = document.createElement('ul');
       costList.className = 'time-block-cost-detail';
       for (const item of block.costItems) {
         const li = document.createElement('li');
         li.className = 'cost-item-row';
-
-        const label = document.createElement('span');
-        label.textContent = item.overridden
+        li.textContent = item.overridden
           ? `${item.category}: 총 ${item.amount.toLocaleString('ko-KR')} ${item.currency} / ${item.headcount}인 (원래 ${item.original.amount.toLocaleString('ko-KR')} ${item.original.currency})`
           : `${item.category}: 총 ${item.amount.toLocaleString('ko-KR')} ${item.currency} / ${item.headcount}인`;
-        li.appendChild(label);
-
-        const buttonGroup = document.createElement('span');
-        const editButton = document.createElement('button');
-        editButton.type = 'button';
-        editButton.className = 'cost-item-edit-button';
-        editButton.textContent = '수정';
-        buttonGroup.appendChild(editButton);
-
-        if (item.overridden) {
-          const resetButton = document.createElement('button');
-          resetButton.type = 'button';
-          resetButton.className = 'cost-item-edit-button';
-          resetButton.textContent = '원래대로';
-          resetButton.addEventListener('click', () => handlers.onResetCostItem(item.key));
-          buttonGroup.appendChild(resetButton);
-        }
-        if (item.isCustom) {
-          const deleteButton = document.createElement('button');
-          deleteButton.type = 'button';
-          deleteButton.className = 'cost-item-edit-button';
-          deleteButton.textContent = '삭제';
-          deleteButton.addEventListener('click', () => {
-            if (!window.confirm('이 비용 항목을 삭제할까요?')) return;
-            handlers.onResetCostItem(item.key);
-          });
-          buttonGroup.appendChild(deleteButton);
-        }
-        li.appendChild(buttonGroup);
-
-        const editForm = renderCostItemEditForm(item, handlers.onEditCostItem);
-        editForm.hidden = true;
-        editButton.addEventListener('click', () => {
-          editForm.hidden = !editForm.hidden;
-        });
-
         costList.appendChild(li);
-        costList.appendChild(editForm);
       }
       more.appendChild(costList);
-    }
-
-    const anchorKey = block.blockKey || block.customId;
-    if (anchorKey) {
-      more.appendChild(renderAddCostItemForm((values) => handlers.onAddCostItem(anchorKey, values)));
     }
 
     wrapper.appendChild(more);

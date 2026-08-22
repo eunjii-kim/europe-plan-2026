@@ -100,8 +100,11 @@ export function buildCostItemKey(dayId, blockIndex, itemIndex) {
 /**
  * 사용자가 수정한 값(budgetOverrides)을 원본 itineraryData에 덮어씌운 새 배열을 만든다.
  * 각 costItem에는 key와 overridden 플래그가 함께 붙는다.
+ *
+ * itemIndex는 원본 costItems 배열을 그대로 순회하며 매길 때만 안정적이므로,
+ * 삭제된 항목 걸러내기는 반드시 key 부여가 끝난 뒤에 한다.
  * @param {Array} itineraryData
- * @param {Map<string, { amount: number, currency: string, headcount: number }>} overridesMap
+ * @param {Map<string, { amount: number, currency: string, headcount: number, deleted?: boolean }>} overridesMap
  * @returns {Array}
  */
 export function applyBudgetOverrides(itineraryData, overridesMap) {
@@ -109,13 +112,15 @@ export function applyBudgetOverrides(itineraryData, overridesMap) {
     ...day,
     timeBlocks: day.timeBlocks.map((block, blockIndex) => ({
       ...block,
-      costItems: (block.costItems || []).map((item, itemIndex) => {
-        const key = buildCostItemKey(day.id, blockIndex, itemIndex);
-        const override = overridesMap.get(key);
-        return override
-          ? { ...item, ...override, key, overridden: true, original: item }
-          : { ...item, key, overridden: false };
-      }),
+      costItems: (block.costItems || [])
+        .map((item, itemIndex) => {
+          const key = buildCostItemKey(day.id, blockIndex, itemIndex);
+          const override = overridesMap.get(key);
+          return override
+            ? { ...item, ...override, key, overridden: true, deleted: Boolean(override.deleted), original: item }
+            : { ...item, key, overridden: false };
+        })
+        .filter((item) => !item.deleted),
     })),
   }));
 }
@@ -131,6 +136,16 @@ const CUSTOM_COST_ITEM_MARKER = '__custom__';
  */
 export function buildCustomCostItemKeyPrefix(anchorKey) {
   return `${anchorKey}${CUSTOM_COST_ITEM_MARKER}`;
+}
+
+/**
+ * 사용자가 새로 추가한 비용 항목의 키인지 판별한다.
+ * 원본 항목은 문서를 지워도 data.js에서 다시 살아나므로, 삭제 방식이 서로 다르다.
+ * @param {string} key
+ * @returns {boolean}
+ */
+export function isCustomCostItemKey(key) {
+  return key.includes(CUSTOM_COST_ITEM_MARKER);
 }
 
 /**

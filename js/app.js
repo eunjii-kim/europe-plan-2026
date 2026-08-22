@@ -31,7 +31,13 @@ import {
   renderMemoList,
   PLACE_FILTER_ALL,
 } from './render.js';
-import { formatKrw, applyBudgetOverrides, applyCustomCostItems, groupCustomCostItemsByAnchorKey } from './budgetCalc.js';
+import {
+  formatKrw,
+  applyBudgetOverrides,
+  applyCustomCostItems,
+  groupCustomCostItemsByAnchorKey,
+  isCustomCostItemKey,
+} from './budgetCalc.js';
 import { UNSPECIFIED_REGION_LABEL } from './expenseCalc.js';
 import { applyScheduleOverrides } from './scheduleCalc.js';
 import { setupScrollSpy, updateActiveDayPill } from './scrollSpy.js';
@@ -531,6 +537,28 @@ async function saveBlockLinkedPlaces(block, linkedPlaces) {
   }
 }
 
+/**
+ * 일정 수정 폼에서 함께 편집한 예산 변경분을 한 번에 반영한다.
+ * 저장 대상이 원본 항목인지 사용자가 추가한 항목인지에 따라 삭제 방식이 다르다.
+ * @param {string} anchorKey - 원본 블록의 blockKey 또는 사용자가 추가한 블록의 customId
+ * @param {{ items: Array, removedItems: Array, resetKeys: string[] }} budget - renderBudgetEditSection.collect()의 결과
+ * @returns {Promise<void>}
+ */
+async function saveBlockBudget(anchorKey, budget) {
+  const { items = [], removedItems = [], resetKeys = [] } = budget || {};
+  await Promise.all([
+    // 사용자가 추가한 항목은 문서를 지우면 그대로 사라지지만,
+    // 원본 항목은 문서를 지우면 data.js 값이 다시 살아나므로 삭제 표시를 남겨야 한다.
+    ...removedItems.map((item) =>
+      isCustomCostItemKey(item.key)
+        ? clearBudgetOverride(item.key)
+        : setBudgetOverride(item.key, { ...item, deleted: true }),
+    ),
+    ...resetKeys.map((key) => clearBudgetOverride(key)),
+    ...items.map((item) => (item.key ? setBudgetOverride(item.key, item) : addCustomCostItem(anchorKey, item))),
+  ]);
+}
+
 async function main() {
   document.getElementById('tripTitle').textContent = TRIP_INFO.title;
   document.getElementById('tripSub').textContent = `${TRIP_INFO.regionLabel} · ${TRIP_INFO.startDate} ~ ${TRIP_INFO.endDate}`;
@@ -633,33 +661,10 @@ async function main() {
   };
 
   const handlers = {
-    onEditCostItem: async (key, values) => {
-      try {
-        await setBudgetOverride(key, values);
-      } catch (error) {
-        console.error('일정 비용 수정 실패', error);
-        showFirebaseNotice();
-      }
-    },
-    onResetCostItem: async (key) => {
-      try {
-        await clearBudgetOverride(key);
-      } catch (error) {
-        console.error('일정 비용 초기화 실패', error);
-        showFirebaseNotice();
-      }
-    },
-    onAddCostItem: async (anchorKey, values) => {
-      try {
-        await addCustomCostItem(anchorKey, values);
-      } catch (error) {
-        console.error('비용 항목 추가 실패', error);
-        showFirebaseNotice();
-      }
-    },
     onEditBlock: async (blockKey, values) => {
       try {
         await setScheduleOverride(blockKey, values);
+        await saveBlockBudget(blockKey, values.budget);
         scheduleEditingBlockId = null;
         renderScheduleAndSummary();
       } catch (error) {
@@ -670,6 +675,7 @@ async function main() {
     onEditCustomBlock: async (customId, values) => {
       try {
         await updateScheduleCustomBlock(customId, values);
+        await saveBlockBudget(customId, values.budget);
         scheduleEditingBlockId = null;
         renderScheduleAndSummary();
       } catch (error) {

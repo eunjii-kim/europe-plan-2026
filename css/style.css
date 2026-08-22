@@ -804,77 +804,97 @@ main {
 }
 
 .cost-item-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--spacing-2);
   padding: var(--spacing-1) 0;
 }
 
-.cost-item-edit-button {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--card);
-  color: var(--foreground);
-  font-size: 0.75rem;
-  padding: 2px 8px;
-  cursor: pointer;
-  min-height: 28px;
+/* 일정 수정 폼 안의 예산 편집 영역 */
+.budget-edit-section {
+  flex-basis: 100%;
+  margin-top: var(--spacing-1);
+  padding-top: var(--spacing-2);
+  border-top: 1px dashed var(--border);
 }
 
-.cost-item-edit-form {
+.budget-edit-label {
+  display: block;
+  margin-bottom: var(--spacing-1);
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--muted-foreground);
+}
+
+.budget-edit-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-1);
+}
+
+.budget-edit-row {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--spacing-1);
   align-items: center;
-  margin: var(--spacing-1) 0;
+  gap: var(--spacing-1);
 }
 
-.cost-item-edit-form input,
-.cost-item-edit-form select {
+.budget-edit-row input,
+.budget-edit-row select {
   padding: 4px 6px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: var(--background);
   color: var(--foreground);
   font-size: 0.8rem;
-  width: 90px;
 }
 
-.cost-item-edit-form button {
-  border-radius: var(--radius-sm);
+.budget-edit-row select[name='category'] {
+  width: 120px;
+}
+
+.budget-edit-row input[name='amount'] {
+  flex: 1;
+  min-width: 80px;
+}
+
+.budget-edit-row select[name='currency'] {
+  width: 72px;
+}
+
+.budget-edit-row input[name='headcount'] {
+  width: 56px;
+}
+
+.time-block-edit-form .budget-edit-remove-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  min-height: 28px;
+  padding: 4px;
+  background: none;
   border: 1px solid var(--border);
-  background: var(--primary);
-  color: var(--primary-foreground);
+  color: var(--muted-foreground);
+}
+
+.time-block-edit-form .budget-edit-reset-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px;
+  background: none;
+  border: none;
+  color: var(--muted-foreground);
   font-size: 0.75rem;
-  padding: 4px 10px;
-  cursor: pointer;
 }
 
-.cost-item-edit-form button.secondary {
-  background: var(--card);
-  color: var(--foreground);
-}
-
-.cost-item-edit-form select[name='category'] {
-  width: 140px;
-}
-
-.cost-item-add-section {
-  margin-top: var(--spacing-2);
-  padding-top: var(--spacing-2);
-  border-top: 1px dashed var(--border);
-}
-
-.cost-item-add-button {
+.time-block-edit-form .budget-edit-add-button {
+  margin-top: var(--spacing-1);
   padding: 6px var(--spacing-3);
   border: 1px dashed var(--border);
-  border-radius: var(--radius-sm);
   background: none;
   color: var(--primary);
   font-family: var(--font-sans);
   font-size: 0.8rem;
-  cursor: pointer;
 }
 
 .rate-status,
