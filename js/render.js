@@ -249,7 +249,7 @@ function renderBudgetEditSection(costItems) {
           return;
         }
         const values = readBudgetRow(row);
-        // 손대지 않은 기존 항목까지 저장하면 전부 "수정됨"으로 표시되므로 건너뛴다.
+        // 손대지 않은 기존 항목까지 불필요하게 덮어쓰지 않도록 건너뛴다.
         if (row.dataset.key && row.dataset.original === JSON.stringify(values)) return;
         items.push(row.dataset.key ? { key: row.dataset.key, ...values } : values);
       });
@@ -770,8 +770,8 @@ function renderTimeBlock(block, rates, handlers, context) {
   main.className = 'time-block-main';
   main.innerHTML = `
     <span class="time-block-time">${escapeHtml(block.time)}</span>
-    <span class="time-block-title${block.overridden ? ' is-overridden' : ''}">${icon ? `${icon} ` : ''}${escapeHtml(block.title)}</span>
-    ${mainCostItem ? `<span class="time-block-cost${mainCostItem.overridden ? ' is-overridden' : ''}">${formatCostBadge(mainCostItem, rates)}</span>` : ''}
+    <span class="time-block-title">${icon ? `${icon} ` : ''}${escapeHtml(block.title)}</span>
+    ${mainCostItem ? `<span class="time-block-cost">${formatCostBadge(mainCostItem, rates)}</span>` : ''}
   `;
   wrapper.appendChild(main);
 

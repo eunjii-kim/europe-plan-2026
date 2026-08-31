@@ -369,19 +369,6 @@ main {
   white-space: nowrap;
 }
 
-.time-block-cost.is-overridden::after {
-  content: ' (수정됨)';
-  color: var(--muted-foreground);
-  font-weight: 400;
-}
-
-.time-block-title.is-overridden::after {
-  content: ' (수정됨)';
-  color: var(--muted-foreground);
-  font-weight: 400;
-  font-size: 0.75rem;
-}
-
 .time-block-edit-form {
   display: flex;
   flex-wrap: wrap;
