@@ -2365,6 +2365,32 @@ main {
   min-height: 20px;
 }
 
+.checklist-item-drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 28px;
+  min-height: 28px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--muted-foreground);
+  cursor: grab;
+  /* 손잡이 위에서만 브라우저 기본 스크롤/확대를 막아야 끌어서 옮기기가 동작한다.
+     항목의 나머지 부분에서는 평소처럼 목록을 스크롤할 수 있어야 하므로 여기에만 준다. */
+  touch-action: none;
+  -webkit-touch-callout: none;
+  user-select: none;
+}
+
+.checklist-item.is-dragging {
+  opacity: 0.6;
+  background: var(--muted);
+  border-radius: var(--radius-sm);
+  cursor: grabbing;
+}
+
 .checklist-item-content {
   display: flex;
   flex-direction: column;

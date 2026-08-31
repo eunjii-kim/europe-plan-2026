@@ -261,6 +261,9 @@ function renderBudgetEditSection(costItems) {
 /**
  * 일정 블록의 시간/제목/메모/예산을 그 자리에서 바로 고치는 인라인 폼을 만든다.
  * 예산도 이 폼 안에서 수정·추가·삭제하고, 저장 버튼을 누를 때 함께 반영된다.
+ *
+ * 제목은 비워 둘 수 있다 — 이동 중처럼 메모나 예산만 남기고 싶은 일정이 있는데,
+ * 제목이 필수면 지우고 저장할 방법이 아예 없었다. 시간은 일정을 정렬하는 기준이라 계속 필수다.
  * @param {object} block - costItems를 포함한 병합 완료 블록
  * @param {(values: { time: string, title: string, note: string, budget: object }) => void} onSave
  * @param {() => void} onCancel
@@ -271,7 +274,7 @@ function renderTimeBlockEditForm(block, onSave, onCancel) {
   form.className = 'time-block-edit-form';
   form.innerHTML = `
     <input type="text" name="time" value="${escapeHtml(block.time)}" placeholder="시간 (예: 09:00)" aria-label="시간" required />
-    <input type="text" name="title" value="${escapeHtml(block.title)}" placeholder="제목" aria-label="제목" required />
+    <input type="text" name="title" value="${escapeHtml(block.title)}" placeholder="제목 (선택)" aria-label="제목" />
     <textarea name="note" placeholder="메모" aria-label="메모">${escapeHtml(block.note || '')}</textarea>
   `;
 
@@ -1851,6 +1854,99 @@ function createChecklistSectionTitleEdit(section, onEditSectionTitle) {
   return { titleEl, editButton, editForm };
 }
 
+/** 끌어서 옮기는 중 화면 위/아래 이만큼 안으로 들어오면 자동으로 스크롤한다(px). */
+const DRAG_SCROLL_EDGE_PX = 60;
+
+/** 자동 스크롤이 한 번에 움직이는 거리(px) */
+const DRAG_SCROLL_STEP_PX = 8;
+
+/** 자동 스크롤을 다시 그리는 간격(ms). 한 프레임에 해당한다. */
+const DRAG_SCROLL_INTERVAL_MS = 16;
+
+/**
+ * 목록의 항목을 손잡이로 끌어서 순서를 바꿀 수 있게 만든다.
+ *
+ * HTML5 드래그 앤 드롭(dragstart 등)은 휴대폰 터치에서 동작하지 않아 포인터 이벤트로 직접 구현했다.
+ * 손잡이에서만 끌리게 하는 이유도 같다 — 항목 전체를 잡으면 목록을 위아래로 넘기는 평범한
+ * 스크롤과 구별할 수 없다. 손잡이에만 `touch-action: none`을 줘서 그 위에서만 스크롤을 막는다.
+ * @param {HTMLElement} listEl - 자식이 곧 항목인 목록 요소. 각 항목에 dataset.itemId가 있어야 한다.
+ * @param {(orderedIds: string[]) => void} onReorder - 순서가 실제로 바뀐 경우에만 호출된다
+ */
+function enableListReorder(listEl, onReorder) {
+  const readOrder = () => [...listEl.children].map((el) => el.dataset.itemId);
+
+  let dragging = null;
+  let orderBeforeDrag = null;
+  let autoScrollStep = 0;
+  let autoScrollTimer = null;
+
+  const stopAutoScroll = () => {
+    clearInterval(autoScrollTimer);
+    autoScrollTimer = null;
+    autoScrollStep = 0;
+  };
+
+  /** 손가락이 화면 위/아래 끝에 닿으면 목록이 따라 스크롤되게 한다. */
+  const updateAutoScroll = (clientY) => {
+    if (clientY < DRAG_SCROLL_EDGE_PX) {
+      autoScrollStep = -DRAG_SCROLL_STEP_PX;
+    } else if (window.innerHeight - clientY < DRAG_SCROLL_EDGE_PX) {
+      autoScrollStep = DRAG_SCROLL_STEP_PX;
+    } else {
+      stopAutoScroll();
+      return;
+    }
+    if (autoScrollTimer) return;
+    autoScrollTimer = setInterval(() => window.scrollBy(0, autoScrollStep), DRAG_SCROLL_INTERVAL_MS);
+  };
+
+  /** 끌고 있는 항목을 지금 손가락 위치에 맞는 자리로 옮긴다. */
+  const moveDraggingTo = (clientY) => {
+    const others = [...listEl.children].filter((el) => el !== dragging);
+    // 손가락이 절반 위쪽에 있는 첫 항목 앞에 끼워 넣는다. 그런 항목이 없으면 맨 끝이다.
+    const next = others.find((el) => {
+      const rect = el.getBoundingClientRect();
+      return clientY < rect.top + rect.height / 2;
+    });
+    listEl.insertBefore(dragging, next || null);
+  };
+
+  const finishDrag = () => {
+    if (!dragging) return;
+    dragging.classList.remove('is-dragging');
+    dragging = null;
+    stopAutoScroll();
+
+    // 끄는 도중 목록이 다시 그려졌다면(다른 기기에서 수정 등) 지금 순서는 믿을 수 없다.
+    if (!listEl.isConnected) return;
+
+    const nextOrder = readOrder();
+    if (nextOrder.join() !== orderBeforeDrag.join()) onReorder(nextOrder);
+  };
+
+  listEl.querySelectorAll('.checklist-item-drag-handle').forEach((handle) => {
+    handle.addEventListener('pointerdown', (event) => {
+      // 기본 동작(텍스트 선택, 길게 눌러 뜨는 메뉴)을 막아야 끄는 동안 방해받지 않는다.
+      event.preventDefault();
+      dragging = handle.closest('.checklist-item');
+      orderBeforeDrag = readOrder();
+      dragging.classList.add('is-dragging');
+      // 손가락이 손잡이 밖으로 나가도 이벤트를 계속 받으려면 포인터를 붙잡아 둬야 한다.
+      handle.setPointerCapture(event.pointerId);
+    });
+
+    handle.addEventListener('pointermove', (event) => {
+      if (!dragging) return;
+      event.preventDefault();
+      moveDraggingTo(event.clientY);
+      updateAutoScroll(event.clientY);
+    });
+
+    handle.addEventListener('pointerup', finishDrag);
+    handle.addEventListener('pointercancel', finishDrag);
+  });
+}
+
 /**
  * 체크리스트 섹션 목록(섹션별 준비물 포함)을 렌더링한다.
  * @param {HTMLElement} listEl
@@ -1871,6 +1967,7 @@ function createChecklistSectionTitleEdit(section, onEditSectionTitle) {
  *   onToggleSectionEditMode: (sectionId: string) => void,
  *   onToggleItemSelected: (itemId: string) => void,
  *   onDeleteSelectedItems: (sectionId: string) => void,
+ *   onReorderItems: (sectionId: string, orderedIds: string[]) => void,
  * }} handlers
  */
 export function renderChecklistSections(listEl, sections, itemsBySectionId, editModeSectionIds, selectedItemIds, handlers) {
@@ -1994,6 +2091,14 @@ export function renderChecklistSections(listEl, sections, itemsBySectionId, edit
       const li = document.createElement('li');
       li.className = 'checklist-item';
       li.classList.toggle('is-checked', !!item.checked);
+      li.dataset.itemId = item.id;
+
+      const dragHandle = document.createElement('button');
+      dragHandle.type = 'button';
+      dragHandle.className = 'checklist-item-drag-handle';
+      dragHandle.innerHTML = ICONS.gripVertical;
+      dragHandle.setAttribute('aria-label', `${item.title} 순서 변경 손잡이`);
+      li.appendChild(dragHandle);
 
       const checkbox = document.createElement('input');
       checkbox.type = 'checkbox';
@@ -2080,6 +2185,7 @@ export function renderChecklistSections(listEl, sections, itemsBySectionId, edit
 
       itemList.appendChild(li);
     }
+    enableListReorder(itemList, (orderedIds) => handlers.onReorderItems(section.id, orderedIds));
     sectionEl.appendChild(itemList);
 
     listEl.appendChild(sectionEl);
