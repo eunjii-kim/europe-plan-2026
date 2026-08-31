@@ -90,15 +90,17 @@ export function subscribeToChecklistItems(onChange, onError) {
  * 섹션에 새 준비물을 추가한다.
  * @param {string} sectionId
  * @param {string} title
+ * @param {number} order - 섹션 안에서의 정렬 순서 (보통 그 섹션의 현재 준비물 개수)
  * @returns {Promise<void>}
  */
-export async function addChecklistItem(sectionId, title) {
+export async function addChecklistItem(sectionId, title, order) {
   await addDoc(checklistItemsCollection, {
     sectionId,
     title,
     checked: false,
     memo: '',
     link: '',
+    order,
     createdAt: serverTimestamp(),
   });
 }
@@ -150,4 +152,14 @@ export async function updateChecklistItemLink(itemId, link) {
  */
 export async function updateChecklistItemTitle(itemId, title) {
   await updateDoc(doc(checklistItemsCollection, itemId), { title });
+}
+
+/**
+ * 준비물의 정렬 순서를 수정한다. 끌어서 순서를 바꿀 때 쓴다.
+ * @param {string} itemId
+ * @param {number} order
+ * @returns {Promise<void>}
+ */
+export async function updateChecklistItemOrder(itemId, order) {
+  await updateDoc(doc(checklistItemsCollection, itemId), { order });
 }

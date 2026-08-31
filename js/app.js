@@ -75,6 +75,7 @@ import {
   updateChecklistItemMemo,
   updateChecklistItemLink,
   updateChecklistItemTitle,
+  updateChecklistItemOrder,
 } from './checklist.js';
 import { subscribeToMemos, addMemo, deleteMemo, updateMemo } from './memos.js';
 import { formatMegabytes, measureMemoSize } from './memoAttachments.js';
@@ -939,6 +940,7 @@ async function main() {
   let latestChecklistSections = [];
   let latestChecklistItems = [];
   let checklistOrderMigrated = false;
+  let checklistItemOrderMigrated = false;
   const checklistEditModeSectionIds = new Set();
   const checklistSelectedItemIds = new Set();
   const renderChecklistTab = () => {
@@ -961,6 +963,23 @@ async function main() {
       list.push(item);
       itemsBySectionId.set(item.sectionId, list);
     }
+
+    // 준비물에 order가 생기기 전에 만든 항목들은 값이 없다. 지금 보이는 순서(생성순)를
+    // 그대로 order로 한 번 굳혀 둬야 끌어서 옮긴 순서가 어긋나지 않는다.
+    const itemsNeedingOrder = latestChecklistItems.some((item) => typeof item.order !== 'number');
+    if (itemsNeedingOrder && !checklistItemOrderMigrated && latestChecklistItems.length > 0) {
+      checklistItemOrderMigrated = true;
+      Promise.all(
+        [...itemsBySectionId.values()].flatMap((items) =>
+          items.map((item, index) => updateChecklistItemOrder(item.id, index)),
+        ),
+      ).catch((error) => {
+        console.error('체크리스트 준비물 순서 마이그레이션 실패', error);
+      });
+    }
+    if (!itemsNeedingOrder) {
+      itemsBySectionId.forEach((items) => items.sort((a, b) => (a.order ?? 0) - (b.order ?? 0)));
+    }
     renderChecklistSections(
       document.getElementById('checklistSectionList'),
       sortedSections,
@@ -980,7 +999,8 @@ async function main() {
         },
         onAddItem: async (sectionId, title) => {
           try {
-            await addChecklistItem(sectionId, title);
+            // 새 준비물은 그 섹션의 맨 아래에 붙인다.
+            await addChecklistItem(sectionId, title, (itemsBySectionId.get(sectionId) || []).length);
           } catch (error) {
             console.error('체크리스트 준비물 추가 실패', error);
             showFirebaseNotice();
@@ -1074,6 +1094,15 @@ async function main() {
             checklistSelectedItemIds.add(itemId);
           }
           renderChecklistTab();
+        },
+        onReorderItems: async (sectionId, orderedIds) => {
+          try {
+            // 끌어서 놓은 자리를 그대로 0,1,2...로 다시 매긴다.
+            await Promise.all(orderedIds.map((itemId, index) => updateChecklistItemOrder(itemId, index)));
+          } catch (error) {
+            console.error('체크리스트 준비물 순서 변경 실패', error);
+            showFirebaseNotice();
+          }
         },
         onDeleteSelectedItems: async (sectionId) => {
           const idsToDelete = latestChecklistItems
